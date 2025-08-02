@@ -704,6 +704,9 @@
 		}
 
 		function cleanHtmlTags(htmlString) {
+			// Remove weird Foundry formatting for tags
+			htmlString = htmlString.replace(/ data-start="\d+" data-end="\d+"/g, "");
+			
 			// Replace <b> or <strong> tags with **text**
 			htmlString = htmlString.replace(/<(b|strong)>(\s*)([\s\S]+?)(\s*)<\/\1>/gi, function (match, tag, leadingSpace, text, trailingSpace) {
 				return `**${text.trim()}** `;
