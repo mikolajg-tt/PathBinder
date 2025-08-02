@@ -666,7 +666,7 @@
 			const firstAdjustedBonus = adjustedBonus - penalty;
 			const secondAdjustedBonus = adjustedBonus - secondPenalty;
 
-			const damageString = dmgRolls.map(d => `${d.damage} ${d.damageType}`).join(" + ");
+			const damageString = dmgRolls.map(d => `${d.damage}${d.category === 'persistent' ? ' ' + d.category : ''} ${d.damageType}`).join(" + ");
 
 			const description = combatItem.system.description.value
 				? `\n{{paragraph: ${cleanHtmlTags(combatItem.system.description.value)}}}`
@@ -720,7 +720,7 @@
 
 			// Replace @@Damage[ ] with formatted string
 			htmlString = htmlString.replace(
-				/@@Damage\[\s*\(?\s*([^\s\[\]()]+)\s*\)?\s*\[?([a-zA-Z]+)\]?\s*\]/,
+				/@@Damage\[\s*\(?\s*([^\s\[\]()]+)\s*\)?\s*\[?([a-zA-Z]+)\]?\s*\]/g,
 				'$1 $2'
 			);
 
