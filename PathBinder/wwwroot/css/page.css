@@ -341,3 +341,15 @@
 .page .size {
     background-color: #3B7B59;
 }
+
+.page .uncommon {
+    background-color: #98513D;
+}
+
+.page .rare {
+    background-color: #002664;
+}
+
+.page .unique {
+    background-color: #54166E;
+}

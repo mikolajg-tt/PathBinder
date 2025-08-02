@@ -409,7 +409,6 @@
 				huge: "Huge",
 				grg: "Gargantuan"
 			};
-			const alignmentTags = ["chaotic", "evil", "lawful", "good", "neutral"];
 
 			const addOutput = (result) => {
 				if (Array.isArray(result)) {
@@ -420,8 +419,9 @@
 			};
 
 			addOutput(formatCreatureLabel(creatureData));
+			addOutput(formatRarity(creatureData));
 			addOutput(formatSize(creatureData, sizeMappings));
-			addOutput(formatTraits(creatureData, alignmentTags));
+			addOutput(formatTraits(creatureData));
 			addOutput(formatPerception(creatureData));
 			addOutput(formatLanguages(creatureData));
 			addOutput(formatSkills(creatureData));
@@ -446,9 +446,13 @@
 			return `#### ${creatureData.name} {{label Creature ${creatureData.system.details.level.value}}}`;
 		}
 
-		function formatTraits(creatureData, alignmentTags) {
-			return creatureData.system.traits.value.filter(trait => !alignmentTags.includes(trait))
-				.map(trait => `{{tag ${capitalizeFirstLetter(trait)}}}`);
+		function formatTraits(creatureData) {
+			return creatureData.system.traits.value.map(trait => `{{tag ${capitalizeFirstLetter(trait)}}}`);
+		}
+
+		function formatRarity(creatureData) {
+			const rarityValue = creatureData.system.traits.rarity;
+			return rarityValue && rarityValue != 'common' ? `{{tag ${capitalizeFirstLetter(rarityValue)}[class=${rarityValue}]}}` : '';
 		}
 
 		function formatSize(creatureData, sizeMappings) {
