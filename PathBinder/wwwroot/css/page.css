@@ -30,6 +30,10 @@
     mask-image: url('../assets/base.png')!important;
 }
 
+.page .noBase {
+    mask-image: url('../assets/no-base.png') !important;
+}
+
 .page, .columnWrapper {
     column-count: 2;
     column-fill: auto;
