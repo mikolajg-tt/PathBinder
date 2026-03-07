@@ -31,7 +31,7 @@
 }
 
 .page .noBase {
-    mask-image: url('../assets/no-base.png') !important;
+    mask-image: url('../assets/no-base.png')!important;
 }
 
 .page, .columnWrapper {

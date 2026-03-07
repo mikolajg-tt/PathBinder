@@ -90,7 +90,8 @@
 			"table": { "html": "table", "classes": ["table"] },
 			"dc": {"html": "span"},
 			"mask": {"html": "div"},
-			"shape": {"html": "div"}
+			"shape": {"html": "div"},
+			"pagenumber":{"html": "p", "classes": ["paragraph"]}
 		}
 		const dcs = {
 			0: 14, 1: 15, 2: 16, 3: 18, 4: 19, 5: 20, 6: 22, 7: 23, 8: 24, 9: 26,
@@ -910,7 +911,7 @@
 
 		}
 
-		function replacePlaceholders(placeholder, page, wrapper) {
+		function replacePlaceholders(placeholder, page, wrapper, pageNumber) {
 			// Remember that classes need to be in a list, even if only one element
 			const regex = /([a-zA-Z]+)(:*)([\s\S]*?)(?:\[(.*?)\])?$/g;
 			const elements = paragraphElements;
@@ -1078,26 +1079,31 @@
 					}
 				}
 
-					if (elementName === "frame") {
-						const [imgSrc, pageName = "page"] = content.trim().split(",").map(s => s.trim());
+				if (elementName === "frame") {
+					const [imgSrc, pageName = "page"] = content.trim().split(",").map(s => s.trim());
 
-						const pageElement = document.createElement(element.html);
-						pageElement.src = `../assets/${pageName}.png`;
+					const pageElement = document.createElement(element.html);
+					pageElement.src = `../assets/${pageName}.png`;
+						
+					wrapper.style.margin = `${parseFloat(newElement.style.padding) + 0.5}cm`;
+					wrapper.style.columnGap = newElement.style.columnGap;
+					const marginInMM = (parseFloat(newElement.style.padding) + 0.5) * 10;
+					newElement.src = imgSrc;
+					newElement.style.padding = 0;
+					newElement.classList.add(elementName);
 
-						wrapper.style.margin = `${parseFloat(newElement.style.padding) + 0.5}cm`;
-						const marginInMM = (parseFloat(newElement.style.padding) + 0.5) * 10;
-						newElement.src = imgSrc;
-						newElement.style.padding = 0;
-						newElement.classList.add(elementName);
+					page.appendChild(pageElement);
+					page.appendChild(newElement);
 
-						page.appendChild(pageElement);
-						page.appendChild(newElement);
+					wrapper.style.width = `${210 - 2 * marginInMM}mm`;
+					wrapper.style.height = `${297 - 2 * marginInMM}mm`;
 
-						wrapper.style.width = `${210 - 2 * marginInMM}mm`;
-						wrapper.style.height = `${297 - 2 * marginInMM}mm`;
+					newElement = '';
+				}
 
-						newElement = '';
-					}
+				if (elementName == "pagenumber") {
+					newElement.innerHTML = pageNumber;
+				}
 
 
 				if (elementName === "dc") {
@@ -1129,7 +1135,7 @@
 			return placeholder;
 		}
 
-		function replaceBrackets(text, page, wrapper) {
+		function replaceBrackets(text, page, wrapper, pageNumber) {
 			text = text.replace(/<\/?p>/g, "");
 			let index = 0;
 			function processSegment() {
@@ -1140,7 +1146,7 @@
 						content += processSegment();
 					} else if (text[index] === '}' && text[index + 1] === '}') {
 						index += 2;
-						return replacePlaceholders(content, page, wrapper);
+						return replacePlaceholders(content, page, wrapper, pageNumber);
 					} else {
 						content += text[index++];
 					}
@@ -1153,7 +1159,7 @@
 				if (line.trim() === "" || (line.startsWith('<') && !line.startsWith('<strong') && !line.startsWith('<b') && !line.startsWith('<em') && !line.startsWith('<i'))) {
 					return line;
 				} else {
-					return replacePlaceholders("paragraph " + line, page, wrapper);
+					return replacePlaceholders("paragraph " + line, page, wrapper, pageNumber);
 				}
 			});
 			return processedLines.join('\n');
@@ -1178,15 +1184,17 @@
 			shadow.innerHTML = "";
 			let htmlContent = editor.getValue();
 			htmlContent = htmlContent.split("\{\{pagebreak\}\}");
+			let pageNumber = 1;
 			for (let element of htmlContent) {
 				let page = createElementWithClass("div", "page");
 				let columnWrapper = createElementWithClass("div", "columnWrapper");
 				element = converter.makeHtml(element);
-				columnWrapper.innerHTML = replaceBrackets(element, page, columnWrapper);
+				columnWrapper.innerHTML = replaceBrackets(element, page, columnWrapper, pageNumber);
 				applyClasses(columnWrapper, ["h1", "subtitle"], "wide");
 				columnWrapper.innerHTML = columnWrapper.innerHTML.replace(/<p><\/p>|}}/gm, "");
 				page.appendChild(columnWrapper);
 				shadow.appendChild(page);
+				pageNumber += 1;
 			}
 			shadow.appendChild(pageStyle);
 
