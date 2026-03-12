@@ -481,7 +481,11 @@
 		}
 
 		function formatLanguages(creatureData) {
-			const languages = creatureData.system.details.languages.value.join(', ');
+			const langData = creatureData.system.details.languages;
+			const parts = [];
+			if (langData.value.length) parts.push(langData.value.map(l => capitalizeFirstLetter(l)).join(', '));
+			if (langData.details) parts.push(langData.details);
+			const languages = parts.join('; ');
 			if (languages) {
 				return `{{line **Languages**  ${languages}}}`;
 			}
