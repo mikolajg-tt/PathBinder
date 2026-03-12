@@ -799,7 +799,7 @@
 			);
 
 			// Replace @@Check with formatted string
-			htmlString = htmlString.replace(new RegExp("@@Check\\[(\\w+)\\|dc:(\\d{2})(\\|basic)?\\]\\s*(save)?", "gi"), function (match, type, dc, basic) {
+			htmlString = htmlString.replace(new RegExp("@@Check\\[(?:type:)?(\\w+)\\|dc:(\\d{2})(\\|basic(?::true)?)?\\]\\s*(save)?", "gi"), function (match, type, dc, basic) {
 				return `DC ${dc} ${basic ? 'basic ' : ''}${type.charAt(0).toUpperCase() + type.slice(1)} save`;
 			});
 
@@ -808,11 +808,12 @@
 				let parts = p1.split("|");
 
 				let formattedParts = parts.map(part => {
-					let match = part.match(/(\d+)/);
+					let value = part.includes(':') ? part.split(':')[1] : part;
+					let match = value.match(/(\d+)/);
 					if (match) {
 						return match[1] + "-foot";
 					}
-					return part;
+					return value;
 				});
 
 				return formattedParts.reverse().join(" ");
@@ -829,6 +830,9 @@
 
 			// Remove braces, keeping the content inside
 			htmlString = htmlString.replace(/{([^}]*)}/g, "$1");
+
+			// Convert [[/r ...]] roll expressions to plain text
+			htmlString = htmlString.replace(/\[\[\/r\s+([^\]]+)\]\]/g, "$1");
 
 			// Remove double square brackets and their content
 			htmlString = htmlString.replace(/\[\[[^\]]*\]\]/g, "");
