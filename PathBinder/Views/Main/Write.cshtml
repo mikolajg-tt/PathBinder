@@ -645,10 +645,19 @@
 
 			const traitsList = combatItem.system.traits.value.map(trait => {
 				let t = trait.includes('-') ? trait.split('-').join(' ') : trait;
-				if (/\d{2,}/.test(t)) t += ' feet';
-				if (t.includes('range')) isRanged = true;
 				return t;
 			});
+
+			const range = combatItem.system.range;
+			if (range && typeof range === 'object') {
+				if (range.increment) {
+					isRanged = true;
+					traitsList.push(`range increment ${range.increment} feet`);
+				} else if (range.max) {
+					isRanged = true;
+					traitsList.push(`range ${range.max} feet`);
+				}
+			}
 			const traits = traitsList.length ? ` \\(${traitsList.join(", ")})` : "";
 
 			const attackEffectsList = combatItem.system.attackEffects.value.map(attackEffect => {
