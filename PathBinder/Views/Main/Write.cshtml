@@ -451,9 +451,12 @@
 			addOutput(formatResistances(creatureData));
 			addOutput(formatImmunities(creatureData));
 			addOutput(formatWeaknesses(creatureData));
+			addOutput(formatReactions(creatureData));
 			addOutput(formatLinebreak());
 			addOutput(formatSpeeds(creatureData));
-			addOutput(formatMelee(creatureData));
+			const strikes = formatStrikes(creatureData);
+			addOutput(strikes.melee);
+			addOutput(strikes.ranged);
 			addOutput(formatSpellcasting(creatureData));
 			addOutput(formatActions(creatureData));
 			return output.join('\n');
@@ -571,8 +574,37 @@
 			return weaknesses ? `{{line **Weaknesses**  ${weaknesses}}}` : '';
 		}
 
-		function formatMelee(creatureData) {
-			return creatureData.items.filter(item => item.type === 'melee').map(melee => formatCombat(melee, false));
+		function formatStrikes(creatureData) {
+			const strikes = creatureData.items
+				.filter(item => item.type === 'melee')
+				.map(melee => formatCombat(melee, false));
+
+			const melee = strikes.filter(s => !s.isRanged).sort((a, b) => a.name.localeCompare(b.name)).map(s => s.text);
+			const ranged = strikes.filter(s => s.isRanged).sort((a, b) => a.name.localeCompare(b.name)).map(s => s.text);
+			return { melee, ranged };
+		}
+
+		function formatReactions(creatureData) {
+			const actionSymbols = {
+				action: actionTag('oneaction'),
+				free: actionTag('freeaction'),
+				reaction: actionTag('reaction'),
+				passive: ""
+			};
+
+			return creatureData.items
+				.filter(item => item.type === 'action' && item.system.actionType.value === 'reaction')
+				.map(action => {
+					const actionSymbol = getActionSymbol(action, actionSymbols);
+					return { action, symbol: actionSymbol, name: action.name };
+				})
+				.sort((a, b) => a.name.localeCompare(b.name))
+				.map(({ action, symbol }) => {
+					return formatActionText(action, symbol)
+						.replace(/paragraph:/, '§§§')
+						.replace(/paragraph:/g, 'paragraph')
+						.replace('§§§', 'paragraph:');
+				});
 		}
 
 		function formatActions(creatureData) {
@@ -584,25 +616,39 @@
 			};
 
 			const actionOrder = {
-				[actionTag('freeaction')]: 0,
-				[actionTag('oneaction')]: 1,
-				[actionTag('twoaction')]: 2,
-				[actionTag('threeaction')]: 3,
-				[actionTag('reaction')]: 4,
-				"": 4
+				'freeaction': 0,
+				'oneaction': 1,
+				'twoaction': 2,
+				'threeaction': 3,
+				'passive': 4
 			};
 
+			const actionCountNames = { 1: 'oneaction', 2: 'twoaction', 3: 'threeaction' };
+
+			function getOrderKey(item) {
+				if (item.system.actionType.value === 'free') return 'freeaction';
+				if (item.system.actionType.value === 'passive') return 'passive';
+				if (item.system.actionType.value === 'action') {
+					const count = item.system.actions.value || 1;
+					return actionCountNames[count] || 'oneaction';
+				}
+				return 'passive';
+			}
+
 			return creatureData.items
-				.filter(item => item.type === 'action')
+				.filter(item => item.type === 'action' && item.system.actionType.value !== 'reaction')
 				.map(action => {
 					const actionSymbol = getActionSymbol(action, actionSymbols);
 					return {
 						action,
-						symbol: actionSymbol
+						symbol: actionSymbol,
+						orderKey: getOrderKey(action),
+						name: action.name
 					};
 				})
 				.sort((a, b) => {
-					return (actionOrder[a.symbol] ?? 5) - (actionOrder[b.symbol] ?? 5);
+					const orderDiff = (actionOrder[a.orderKey] ?? 5) - (actionOrder[b.orderKey] ?? 5);
+					return orderDiff !== 0 ? orderDiff : a.name.localeCompare(b.name);
 				})
 				.map(({ action, symbol }) => {
 					return formatActionText(action, symbol)
@@ -704,10 +750,14 @@
 
 						const combatText = `{{line **${isRanged ? "Ranged" : "Melee"}** ${actionTag('oneaction')} ${combatItem.name} ${formatBonus(adjustedBonus)} [${formatBonus(firstAdjustedBonus)}/${formatBonus(secondAdjustedBonus)}]${traits}, **Damage** ${damageString}${attackEffects}}}${description}`;
 
-			return combatText
-				.replace(/paragraph:/, '§§§')
-				.replace(/paragraph:/g, 'paragraph')
-				.replace('§§§', 'paragraph:');
+			return {
+				text: combatText
+					.replace(/paragraph:/, '§§§')
+					.replace(/paragraph:/g, 'paragraph')
+					.replace('§§§', 'paragraph:'),
+				isRanged,
+				name: combatItem.name
+			};
 		}
 
 		function formatBonus(bonus) {
