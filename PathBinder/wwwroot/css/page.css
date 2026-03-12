@@ -239,6 +239,15 @@
     text-indent: 1em;
 }
 
+.page div.line > .paragraph {
+    text-indent: 0;
+}
+
+.page div.line > .line {
+    text-indent: -1em;
+    margin-left: 0;
+}
+
 .page .line-indent {
     margin-left: 2em;
     text-indent: -1em;

@@ -600,10 +600,7 @@
 				})
 				.sort((a, b) => a.name.localeCompare(b.name))
 				.map(({ action, symbol }) => {
-					return formatActionText(action, symbol)
-						.replace(/paragraph:/, '§§§')
-						.replace(/paragraph:/g, 'paragraph')
-						.replace('§§§', 'paragraph:');
+					return formatActionText(action, symbol);
 				});
 		}
 
@@ -651,10 +648,7 @@
 					return orderDiff !== 0 ? orderDiff : a.name.localeCompare(b.name);
 				})
 				.map(({ action, symbol }) => {
-					return formatActionText(action, symbol)
-						.replace(/paragraph:/, '§§§')
-						.replace(/paragraph:/g, 'paragraph')
-						.replace('§§§', 'paragraph:');
+					return formatActionText(action, symbol);
 				});
 		}
 
@@ -745,16 +739,13 @@
 			const damageString = dmgRolls.map(d => `${d.damage}${d.category === 'persistent' ? ' ' + d.category : ''} ${d.damageType}`).join(" + ");
 
 			const description = combatItem.system.description.value
-				? `\n{{paragraph: ${cleanHtmlTags(combatItem.system.description.value)}}}`
+				? `\n{{paragraph ${cleanHtmlTags(combatItem.system.description.value)}}}`
 				: "";
 
 						const combatText = `{{line **${isRanged ? "Ranged" : "Melee"}** ${actionTag('oneaction')} ${combatItem.name} ${formatBonus(adjustedBonus)} [${formatBonus(firstAdjustedBonus)}/${formatBonus(secondAdjustedBonus)}]${traits}, **Damage** ${damageString}${attackEffects}}}${description}`;
 
 			return {
-				text: combatText
-					.replace(/paragraph:/, '§§§')
-					.replace(/paragraph:/g, 'paragraph')
-					.replace('§§§', 'paragraph:'),
+				text: combatText,
 				isRanged,
 				name: combatItem.name
 			};
@@ -852,7 +843,7 @@
 
 			// Convert **bold** followed by non-bold text to a paragraph format
 			htmlString = htmlString.replace(/(\*\*[^\*]+\*\*)([^*]+)/g, function (match, p1, p2, offset, string) {
-				return offset === 0 ? p1 + p2 : `\n{{paragraph: ${p1}${p2}}}`;
+				return offset === 0 ? p1 + p2 : `\n{{paragraph ${p1}${p2}}}`;
 			});
 
 			return htmlString;
@@ -1004,8 +995,9 @@
 
 				let newElement;
 				let shouldAttach = false;
+				const hasBlockContent = element["html"] === "p" && /<(p|div|table|h[1-6])\b/.test(content);
 				if (element["html"]) {
-					newElement = document.createElement(element["html"]);
+					newElement = document.createElement(hasBlockContent ? "div" : element["html"]);
 				}
 				if (element["src"] !== undefined) {
 					newElement.src = element["src"];
@@ -1050,6 +1042,35 @@
 				}
 				else {
 					newElement.innerHTML = content.trim();
+					if (hasBlockContent) {
+						const children = Array.from(newElement.childNodes);
+						const fragment = document.createDocumentFragment();
+						const blockTags = new Set(['P', 'DIV', 'TABLE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6']);
+						let inlineGroup = [];
+
+						function flushInline() {
+							if (inlineGroup.length && inlineGroup.some(n => n.textContent.trim())) {
+								const p = document.createElement('p');
+								element["classes"]?.forEach(cls => p.classList.add(cls));
+								inlineGroup.forEach(n => p.appendChild(n));
+								fragment.appendChild(p);
+							}
+							inlineGroup = [];
+						}
+
+						for (const child of children) {
+							if (child.nodeType === Node.ELEMENT_NODE && blockTags.has(child.tagName)) {
+								flushInline();
+								fragment.appendChild(child);
+							} else {
+								inlineGroup.push(child);
+							}
+						}
+						flushInline();
+
+						newElement.innerHTML = '';
+						newElement.appendChild(fragment);
+					}
 				}
 
 				element["classes"]?.forEach(className => {
