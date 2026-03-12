@@ -172,6 +172,15 @@
 		});
 		editor.addOverlay({ name: "mustacheHighlight" });
 		let autosaveTimeout;
+		let renderFrame;
+		let cachedPageTexts = [];
+		const displayArea = document.getElementById("displayAreaHolder");
+		const converter = new showdown.Converter();
+		const shadow = displayArea.attachShadow({ mode: "open" });
+		const styleSheet = [...document.styleSheets].find(s => s.href?.includes('/css/page.css'));
+		const pageStyle = document.createElement('style');
+		pageStyle.textContent = [...styleSheet.cssRules].map(rule => rule.cssText).join('\n');
+		shadow.appendChild(pageStyle);
 		editor.on('change', function () {
 			if (autosaveTimeout) {
 				clearTimeout(autosaveTimeout);
@@ -180,16 +189,11 @@
 			saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save';
 			saveButton.disabled = false;
 			autosaveTimeout = setTimeout(animateSaving, 5000);
-		});
-		const displayArea = document.getElementById("displayAreaHolder");
-		const converter = new showdown.Converter();
-		const shadow = displayArea.attachShadow({ mode: "open" });
-		const styleSheet = [...document.styleSheets].find(s => s.href?.includes('/css/page.css'));
-		const pageStyle = document.createElement('style');
-		pageStyle.textContent = [...styleSheet.cssRules].map(rule => rule.cssText).join('\n');
-		editor.on("change", function () {
-			displayChange();
-			$("#displayAreaHolder").scrollTop(localStorage.getItem("PathBinder-Scroll"));
+			if (renderFrame) cancelAnimationFrame(renderFrame);
+			renderFrame = requestAnimationFrame(() => {
+				displayChange();
+				$("#displayAreaHolder").scrollTop(localStorage.getItem("PathBinder-Scroll"));
+			});
 		});
 
 		function toggleWrapSelection(cm, wrapper) {
@@ -1181,23 +1185,38 @@
 		}
 
 		function displayChange() {
-			shadow.innerHTML = "";
 			let htmlContent = editor.getValue();
-			htmlContent = htmlContent.split("\{\{pagebreak\}\}");
-			let pageNumber = 1;
-			for (let element of htmlContent) {
-				let page = createElementWithClass("div", "page");
+			let pageTexts = htmlContent.split("\{\{pagebreak\}\}");
+			let existingPages = shadow.querySelectorAll('.page');
+
+			for (let i = existingPages.length - 1; i >= pageTexts.length; i--) {
+				shadow.removeChild(existingPages[i]);
+			}
+
+			for (let i = 0; i < pageTexts.length; i++) {
+				if (cachedPageTexts[i] === pageTexts[i]) {
+					continue;
+				}
+
+				let page;
+				if (i < existingPages.length) {
+					page = existingPages[i];
+					page.innerHTML = '';
+				} else {
+					page = createElementWithClass("div", "page");
+					shadow.insertBefore(page, pageStyle);
+				}
+
+				let pageNumber = i + 1;
 				let columnWrapper = createElementWithClass("div", "columnWrapper");
-				element = converter.makeHtml(element);
-				columnWrapper.innerHTML = replaceBrackets(element, page, columnWrapper, pageNumber);
+				let html = converter.makeHtml(pageTexts[i]);
+				columnWrapper.innerHTML = replaceBrackets(html, page, columnWrapper, pageNumber);
 				applyClasses(columnWrapper, ["h1", "subtitle"], "wide");
 				columnWrapper.innerHTML = columnWrapper.innerHTML.replace(/<p><\/p>|}}/gm, "");
 				page.appendChild(columnWrapper);
-				shadow.appendChild(page);
-				pageNumber += 1;
 			}
-			shadow.appendChild(pageStyle);
 
+			cachedPageTexts = pageTexts;
 		}
 
 		function animateSaving() {
