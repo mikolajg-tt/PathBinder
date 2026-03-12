@@ -13,6 +13,7 @@
 				<button onclick="promptForHomebrewery()"><i class="fa-solid fa-book"></i>Homebrewery</button>
 				<button onclick="promptForFile()"><i class="fa-solid fa-file-import"></i>Foundry</button>
 				<button onclick="printDocument()"><i class="fa-solid fa-print"></i>Print</button>
+				<button id="actionColorToggle" onclick="toggleActionColor()"><i class="fa-solid fa-palette"></i>Action <span id="actionColorLabel">Dark</span></button>
 			</div>
 			<div class="dropdown">
 				<button class="dropdownButton"><i class="fa-solid fa-bars"></i>Elements</button>
@@ -48,6 +49,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/search/jump-to-line.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js"></script>
 <script>
+	let useWhiteActions = false;
+
+	function toggleActionColor() {
+		useWhiteActions = !useWhiteActions;
+		document.getElementById('actionColorLabel').textContent = useWhiteActions ? 'White' : 'Dark';
+	}
+
+	function actionTag(name) {
+		return useWhiteActions ? `{{${name}white}} ` : `{{${name}}} `;
+	}
+
 	const CREDITS_PAGE = `
 	{{paragraph **Some artwork © Dean Spencer, used with permission. All rights reserved.**}}
 	{{line **Some artwork copyright Murzabaev Roman aka s0ulafein**}}
@@ -565,18 +577,18 @@
 
 		function formatActions(creatureData) {
 			const actionSymbols = {
-				action: "{{oneaction}} ",
-				free: "{{freeaction}} ",
-				reaction: "{{reaction}} ",
+				action: actionTag('oneaction'),
+				free: actionTag('freeaction'),
+				reaction: actionTag('reaction'),
 				passive: ""
 			};
 
 			const actionOrder = {
-				"{{freeaction}} ": 0,
-				"{{oneaction}} ": 1,
-				"{{twoaction}} ": 2,
-				"{{threeaction}} ": 3,
-				"{{reaction}} ": 4,
+				[actionTag('freeaction')]: 0,
+				[actionTag('oneaction')]: 1,
+				[actionTag('twoaction')]: 2,
+				[actionTag('threeaction')]: 3,
+				[actionTag('reaction')]: 4,
 				"": 4
 			};
 
@@ -690,7 +702,7 @@
 				? `\n{{paragraph: ${cleanHtmlTags(combatItem.system.description.value)}}}`
 				: "";
 
-						const combatText = `{{line **${isRanged ? "Ranged" : "Melee"}** {{oneaction}}  ${combatItem.name} ${formatBonus(adjustedBonus)} [${formatBonus(firstAdjustedBonus)}/${formatBonus(secondAdjustedBonus)}]${traits}, **Damage** ${damageString}${attackEffects}}}${description}`;
+						const combatText = `{{line **${isRanged ? "Ranged" : "Melee"}** ${actionTag('oneaction')} ${combatItem.name} ${formatBonus(adjustedBonus)} [${formatBonus(firstAdjustedBonus)}/${formatBonus(secondAdjustedBonus)}]${traits}, **Damage** ${damageString}${attackEffects}}}${description}`;
 
 			return combatText
 				.replace(/paragraph:/, '§§§')
@@ -706,7 +718,7 @@
 			let symbol = actionSymbols[action.system.actionType.value] || "";
 			if (action.system.actionType.value === "action" && action.system.actions.value) {
 				const actionCount = action.system.actions.value;
-				symbol = actionCount === 2 ? "{{twoaction}} " : actionCount === 3 ? "{{threeaction}} " : symbol;
+				symbol = actionCount === 2 ? actionTag('twoaction') : actionCount === 3 ? actionTag('threeaction') : symbol;
 			}
 			return symbol;
 		}
