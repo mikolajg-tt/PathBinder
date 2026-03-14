@@ -794,8 +794,8 @@
 
 			// Replace @@Damage[ ] with formatted string
 			htmlString = htmlString.replace(
-				/@@Damage\[\s*\(?\s*([^\s\[\]()]+)\s*\)?\s*\[?([a-zA-Z]+)\]?\s*\]/g,
-				'$1 $2'
+				/@@Damage\[\s*\(?\s*([^\s\[\]()]+)\s*\)?\s*(?:\[([a-zA-Z]+)\])?\s*\]/g,
+				function(match, roll, type) { return type ? `${roll} ${type}` : roll; }
 			);
 
 			// Replace @@Check with formatted string
