@@ -739,7 +739,7 @@
 			const damageString = dmgRolls.map(d => `${d.damage}${d.category === 'persistent' ? ' ' + d.category : ''} ${d.damageType}`).join(" + ");
 
 			const description = combatItem.system.description.value
-				? `\n{{paragraph ${cleanHtmlTags(combatItem.system.description.value)}}}`
+				? `\n{{paragraph: ${cleanHtmlTags(combatItem.system.description.value)}}}`
 				: "";
 
 						const combatText = `{{line **${isRanged ? "Ranged" : "Melee"}** ${actionTag('oneaction')} ${combatItem.name} ${formatBonus(adjustedBonus)} [${formatBonus(firstAdjustedBonus)}/${formatBonus(secondAdjustedBonus)}]${traits}, **Damage** ${damageString}${attackEffects}}}${description}`;
