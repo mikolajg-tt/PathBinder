@@ -13,7 +13,9 @@
 				<button onclick="promptForHomebrewery()"><i class="fa-solid fa-book"></i>Homebrewery</button>
 				<button onclick="promptForFile()"><i class="fa-solid fa-file-import"></i>Foundry</button>
 				<button onclick="printDocument()"><i class="fa-solid fa-print"></i>Print</button>
-				<button id="actionColorToggle" onclick="toggleActionColor()"><i class="fa-solid fa-palette"></i>Action <span id="actionColorLabel">Dark</span></button>
+				<button onclick="toggleStyleMenu()"><i class="fa-solid fa-palette"></i>Style Menu</button>
+			</div>
+			<div id="styleMenu" class="style-menu hidden">
 			</div>
 			<div class="dropdown">
 				<button class="dropdownButton"><i class="fa-solid fa-bars"></i>Elements</button>
@@ -49,15 +51,89 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/search/jump-to-line.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js"></script>
 <script>
-	let useWhiteActions = false;
-
-	function toggleActionColor() {
-		useWhiteActions = !useWhiteActions;
-		document.getElementById('actionColorLabel').textContent = useWhiteActions ? 'White' : 'Dark';
-	}
+	const defaultStyles = { actionColor: 'dark', pageNumberOffset: 50, pageNumberFlipped: false };
+	let fileStyles = { ...defaultStyles };
 
 	function actionTag(name) {
-		return useWhiteActions ? `{{${name}white}} ` : `{{${name}}} `;
+		return fileStyles.actionColor === 'white' ? `{{${name}white}} ` : `{{${name}}} `;
+	}
+
+	function markUnsaved() {
+		let saveButton = document.getElementById('save');
+		saveButton.disabled = false;
+		saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>Save';
+	}
+
+	function populateStyleMenu() {
+		const menu = document.getElementById('styleMenu');
+		menu.innerHTML = '';
+
+		const actionColorBtn = document.createElement('button');
+		actionColorBtn.id = 'styleActionColor';
+		actionColorBtn.textContent = `Action Color: ${fileStyles.actionColor === 'white' ? 'White' : 'Dark'}`;
+		actionColorBtn.onclick = () => {
+			fileStyles.actionColor = fileStyles.actionColor === 'white' ? 'dark' : 'white';
+			actionColorBtn.textContent = `Action Color: ${fileStyles.actionColor === 'white' ? 'White' : 'Dark'}`;
+			markUnsaved();
+		};
+		menu.appendChild(actionColorBtn);
+
+		const sliderLabel = document.createElement('label');
+		sliderLabel.textContent = `Page Number Offset: ${fileStyles.pageNumberOffset}%`;
+		sliderLabel.style.display = 'block';
+		sliderLabel.style.padding = '8px';
+		menu.appendChild(sliderLabel);
+
+		const slider = document.createElement('input');
+		slider.type = 'range';
+		slider.min = 0;
+		slider.max = 100;
+		slider.value = fileStyles.pageNumberOffset;
+		slider.style.width = '100%';
+		slider.style.padding = '0 8px';
+		slider.style.boxSizing = 'border-box';
+		slider.oninput = () => {
+			fileStyles.pageNumberOffset = parseInt(slider.value);
+			sliderLabel.textContent = `Page Number Offset: ${fileStyles.pageNumberOffset}%`;
+			markUnsaved();
+			cachedPageTexts = [];
+			displayChange();
+		};
+		menu.appendChild(slider);
+
+		const flipLabel = document.createElement('label');
+		flipLabel.style.display = 'flex';
+		flipLabel.style.alignItems = 'center';
+		flipLabel.style.padding = '8px';
+		flipLabel.style.gap = '8px';
+		flipLabel.style.cursor = 'pointer';
+		const flipCheckbox = document.createElement('input');
+		flipCheckbox.type = 'checkbox';
+		flipCheckbox.checked = fileStyles.pageNumberFlipped;
+		flipCheckbox.onchange = () => {
+			fileStyles.pageNumberFlipped = flipCheckbox.checked;
+			markUnsaved();
+			cachedPageTexts = [];
+			displayChange();
+		};
+		flipLabel.appendChild(flipCheckbox);
+		flipLabel.appendChild(document.createTextNode('Flip odd/even'));
+		menu.appendChild(flipLabel);
+	}
+
+	function toggleStyleMenu() {
+		const menu = document.getElementById('styleMenu');
+		menu.classList.toggle('hidden');
+	}
+
+	function applyStyles(stylesJson) {
+		try {
+			const parsed = JSON.parse(stylesJson);
+			fileStyles = { ...defaultStyles, ...parsed };
+		} catch {
+			fileStyles = { ...defaultStyles };
+		}
+		populateStyleMenu();
 	}
 
 	const CREDITS_PAGE = `
@@ -1207,6 +1283,15 @@
 
 				if (elementName == "pagenumber") {
 					newElement.innerHTML = pageNumber;
+					const offset = fileStyles.pageNumberOffset ?? 50;
+					const flipped = fileStyles.pageNumberFlipped ?? false;
+					const isOdd = pageNumber % 2 === 1;
+					const useLeft = flipped ? !isOdd : isOdd;
+					if (useLeft) {
+						newElement.style.left = `${offset}%`;
+					} else {
+						newElement.style.right = `${offset}%`;
+					}
 				}
 
 
@@ -1336,15 +1421,15 @@
 			const r = await fetch("/api/files/" + documentId, {
 						method: "PUT",
 						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({ content: content })
+						body: JSON.stringify({ content: content, styles: JSON.stringify(fileStyles) })
 					});
 		}
 
 		async function getDocument() {
-
 			let row = await fetch("/api/files/" + documentId, { headers: { Accept: "application/json" } });
 			row = await row.json();
 			editor.setValue(row.content);
+			applyStyles(row.styles || '{}');
 		}
 
 		function printDocument() {
@@ -1416,13 +1501,14 @@
 		}
 
 		function fillDropdownContent() {
-			const dropdownContainer = document.querySelector('.dropdownContainer');
+			const elementsContainer = document.querySelector('.dropdownContainer');
 			for (const [key, value] of Object.entries(paragraphElements)) {
 				const button = document.createElement('button');
 				button.textContent = key.charAt(0).toUpperCase() + key.slice(1);
 				button.onclick = () => applyElement(key);
-				dropdownContainer.appendChild(button);
+				elementsContainer.appendChild(button);
 			}
+			populateStyleMenu();
 			const buttons = document.querySelectorAll(".dropdownButton");
 			const targets = document.querySelectorAll(".dropdownContainer");
 			buttons.forEach((button, index) => {

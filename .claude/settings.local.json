@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep -l \"import\\\\|Import\")",
+      "Bash(find D:GitHubPathBinder -name *Controller.cs -o -name *Api*.cs)",
+      "Bash(grep -r \"dropdown\\\\|dropdownContainer\\\\|dropdownButton\" D:GitHubPathBinder --include=*.css --include=*.html --include=*.cshtml)",
+      "Bash(find D:GitHubPathBinder -name FileItem.cs -o -name *Model*.cs)",
+      "Bash(grep \"\\\\.cs$\")",
+      "Bash(dotnet ef:*)",
+      "Bash(dotnet tool:*)",
+      "Bash(dotnet build:*)"
+    ]
+  }
+}

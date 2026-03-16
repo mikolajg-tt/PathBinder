@@ -28,16 +28,18 @@ public class FilesApiController : ControllerBase
     public record FileWriteDto
     {
         [JsonConstructor]
-        public FileWriteDto(string? name = null, string? content = null, string? cover = null)
+        public FileWriteDto(string? name = null, string? content = null, string? cover = null, string? styles = null)
         {
             Name = name;
             Content = content;
             Cover = cover;
+            Styles = styles;
         }
 
         public string? Name { get; }
         public string? Content { get; }
         public string? Cover { get; }
+        public string? Styles { get; }
     }
     public record UrlRequest(string Url);
 
@@ -74,7 +76,7 @@ public class FilesApiController : ControllerBase
         var uid = _userMgr.GetUserId(User)!;
         var row = await _db.Files.FirstOrDefaultAsync(f => f.Id == id && f.UserId == uid);
         if (row is null) return NotFound();
-        return Ok(new FileWriteDto(row.Name, row.Content, row.Cover));
+        return Ok(new FileWriteDto(row.Name, row.Content, row.Cover, row.Styles));
     }
 
     [HttpPost]
@@ -109,6 +111,7 @@ public class FilesApiController : ControllerBase
             Name = string.IsNullOrEmpty(dto.Name) ? "Untitled" : dto.Name,
             Content = string.IsNullOrEmpty(dto.Content) ? templateContent : dto.Content,
             Cover = extractedImageUrl ?? "https://i.imgur.com/9TU96xY.jpg",
+            Styles = dto.Styles ?? "{}",
             LastModified = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
         };
         _db.Files.Add(file);
@@ -141,6 +144,9 @@ public class FilesApiController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(dto.Cover))
             row.Cover = dto.Cover!;
+
+        if (dto.Styles is not null)
+            row.Styles = dto.Styles;
 
         row.LastModified = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         await _db.SaveChangesAsync();

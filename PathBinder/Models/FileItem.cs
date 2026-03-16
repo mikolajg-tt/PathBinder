@@ -18,6 +18,9 @@ public class FileItem
     [Column(TypeName = "TEXT")]
     public string Content { get; set; } = default!;
 
+    [Column(TypeName = "TEXT")]
+    public string Styles { get; set; } = "{}";
+
     public long LastModified { get; set; }
 }
 

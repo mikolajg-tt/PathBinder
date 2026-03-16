@@ -15,6 +15,8 @@
     background-color: var(--background);
     flex-direction: row;
     padding: 0;
+    position: relative;
+    z-index: 9999;
 }
 
 button, #dropdownButton {
@@ -204,6 +206,27 @@ button, #dropdownButton {
 
 .hidden {
     display: none!important;
+}
+
+.style-menu {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    background-color: var(--background);
+    border: 1px solid var(--outline);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 200px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.style-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px;
 }
 
 .modal {
