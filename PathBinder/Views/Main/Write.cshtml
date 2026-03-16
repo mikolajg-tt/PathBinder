@@ -1429,28 +1429,40 @@
 			let row = await fetch("/api/files/" + documentId, { headers: { Accept: "application/json" } });
 			row = await row.json();
 			editor.setValue(row.content);
+			editor.clearHistory();
 			applyStyles(row.styles || '{}');
 		}
 
 		function printDocument() {
-			saveDocument()
-			document.querySelectorAll('head link[rel="stylesheet"]').forEach((link) => {
+			saveDocument();
+
+			var links = '';
+			document.querySelectorAll('head link[rel="stylesheet"]').forEach(function(link) {
 				if (!link.href.endsWith('/css/site.css')) {
-					shadow.appendChild(link.cloneNode());
+					links += '<link rel="stylesheet" href="' + link.href + '" />';
 				}
 			});
-			let printStyle = document.createElement("style");
-			printStyle.textContent = `
-			html { margin: 0!important; }
-			body { margin: 0!important; }
-			.page { margin: 0!important; }
-		`;
-			let printWindow = window.open('', '_blank');
-			printWindow.document.head.appendChild(printStyle);
-			printWindow.document.body.innerHTML = shadow.innerHTML;;
+
+			var pageRule = String.fromCharCode(64) + 'page { size: 210mm 297mm; margin: 0; }';
+			var printCSS = '<style>' + pageRule + '\n' +
+				'html { margin: 0!important; height: auto!important; overflow: auto!important; }\n' +
+				'body { margin: 0!important; height: 100%!important; overflow: auto!important; }\n' +
+				'.page { margin: 0!important; box-shadow: none!important; page-break-after: always; }\n' +
+				'.page:last-child { page-break-after: avoid; }\n' +
+				'<\/style>';
+
+			var html = '<!DOCTYPE html><html><head>' + links + printCSS +
+				'<\/head><body>' + shadow.innerHTML + '<\/body><\/html>';
+
+			var printWindow = window.open('', '_blank');
+			printWindow.document.open();
+			printWindow.document.writeln(html);
 			printWindow.document.close();
-			printWindow.focus();
-			printWindow.print();
+
+			printWindow.onload = function() {
+				printWindow.focus();
+				printWindow.print();
+			};
 		}
 
 		const config = { minColumnWidth: 200, resizerSelector: ".resizer", mainSectionSelector: "section" };
