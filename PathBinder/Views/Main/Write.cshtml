@@ -1040,16 +1040,137 @@
 		}
 
 
+		function get5eDC(level) {
+			var prof = level >= 17 ? 6 : level >= 13 ? 5 : level >= 9 ? 4 : level >= 5 ? 3 : 2;
+			var ability = level >= 8 ? 5 : level >= 4 ? 4 : 3;
+			return 8 + prof + ability;
+		}
+
+		function convertDC(dndDC, level) {
+			var expected5e = get5eDC(level);
+			var pf2e = dcs[level] || dcs[20];
+			var diff = dndDC - expected5e;
+			if (Math.abs(diff) <= 10) {
+				var steps = [-10, -5, -2, 0, 2, 5, 10];
+				var closest = 0;
+				var closestDist = Infinity;
+				for (var i = 0; i < steps.length; i++) {
+					var dist = Math.abs(diff - steps[i]);
+					if (dist < closestDist) {
+						closestDist = dist;
+						closest = steps[i];
+					}
+				}
+				diff = closest;
+			}
+			return pf2e + diff;
+		}
+
+		function convert5eSkills(text) {
+			// Extract level from design section
+			var levelMatch = text.match(/##\s*Design[\s\S]*?level\s+(\d+)/i);
+			var level = levelMatch ? parseInt(levelMatch[1]) : null;
+
+			var skillMap = {
+				'Athletics': 'Athletics',
+				'Acrobatics': 'Acrobatics',
+				'Sleight of Hand': 'Thievery',
+				'Stealth': 'Stealth',
+				'Arcana': 'Arcana',
+				'History': 'Society',
+				'Investigation': 'Perception',
+				'Nature': 'Nature',
+				'Religion': 'Religion',
+				'Animal Handling': 'Nature',
+				'Insight': 'Perception',
+				'Medicine': 'Medicine',
+				'Perception': 'Perception',
+				'Survival': 'Survival',
+				'Deception': 'Deception',
+				'Intimidation': 'Intimidation',
+				'Performance': 'Performance',
+				'Persuasion': 'Diplomacy'
+			};
+			var abilities = 'Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma';
+			// Match patterns like "DC10 Wisdom (Insight)" or "DC 15 Charisma (Persuasion)"
+			text = text.replace(
+				new RegExp('DC\\s*(\\d+)\\s+(?:' + abilities + ')\\s+\\(([^)]+)\\)', 'gi'),
+				function(match, dcNum, skill) {
+					var trimmed = skill.trim();
+					var mapped = null;
+					for (var key in skillMap) {
+						if (key.toLowerCase() === trimmed.toLowerCase()) {
+							mapped = skillMap[key];
+							break;
+						}
+					}
+					if (!mapped) return match;
+					var dc = parseInt(dcNum);
+					if (level !== null) dc = convertDC(dc, level);
+					return '\x00DC' + dc + ' ' + mapped;
+				}
+			);
+			// Convert "Ability (Skill) check" without DC prefix (e.g. "Charisma (Performance) check")
+			text = text.replace(
+				new RegExp('(?:' + abilities + ')\\s+\\(([^)]+)\\)\\s+check', 'gi'),
+				function(match, skill) {
+					var trimmed = skill.trim();
+					var mapped = null;
+					for (var key in skillMap) {
+						if (key.toLowerCase() === trimmed.toLowerCase()) {
+							mapped = skillMap[key];
+							break;
+						}
+					}
+					if (!mapped) return match;
+					return mapped + ' check';
+				}
+			);
+			// Convert "X saving throw" to Pathfinder saves
+			var saveMap = {
+				'strength': 'Fortitude',
+				'dexterity': 'Reflex',
+				'constitution': 'Fortitude',
+				'intelligence': 'Will',
+				'wisdom': 'Will',
+				'charisma': 'Will'
+			};
+			text = text.replace(
+				new RegExp('DC\\s*(\\d+)\\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\\s+saving\\s+throw', 'gi'),
+				function(match, dcNum, ability) {
+					var dc = parseInt(dcNum);
+					if (level !== null) dc = convertDC(dc, level);
+					return '\x00DC' + dc + ' ' + saveMap[ability.toLowerCase()] + ' save';
+				}
+			);
+			// Convert any remaining standalone DCs (e.g. "DC10" or "DC 15")
+			if (level !== null) {
+				text = text.replace(/(?<!\x00)DC\s*(\d+)/g, function(match, dcNum) {
+					var dc = convertDC(parseInt(dcNum), level);
+					return '\x00DC' + dc;
+				});
+			}
+			// Strip placeholder markers
+			text = text.replace(/\x00DC/g, 'DC');
+			return text;
+		}
+
 		function handleHomebrewery() {
 			let text = document.getElementById('homebreweryInput').value;
 			document.getElementById('homebreweryInput').innerHTML = '';
 			closeHomebrewery();
 			text = text.replace(/\\column/g, '{{columnbreak}}');
+			text = text.replace(/\{\{break\}\}/g, '');
+			text = convert5eSkills(text);
 			let pages = text.split('\\page');
+
+			// Extract title from the first page
+			var title = (pages[0].match(/^#\s+(.+)$/m) || [, ''])[1].trim();
+
 			pages[0] = processFrontHomebreweryPage(pages[0]);
 			pages = pages.map(replaceFrames);
 			pages = pages.map(convertMarkdownTables);
-			pages[pages.length - 1] = CREDITS_PAGE;
+			pages[pages.length - 1] = getCreditsPage(title);
 			pages = pages.join('{{pagebreak}}');
 			pages = pages.replace(/(\r?\n\s*){3,}/g, '\n');
 			editor.setValue(pages);
