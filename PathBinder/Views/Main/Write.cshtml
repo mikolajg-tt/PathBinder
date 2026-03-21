@@ -1549,8 +1549,85 @@
 			applyStyles(row.styles || '{}');
 		}
 
-		function printDocument() {
+		async function printDocument() {
 			saveDocument();
+
+			// Rasterize masked elements to canvas so they survive print-to-PDF
+			var maskImageMap = {
+				'mask-center': '/assets/center.webp',
+				'mask-edge': '/assets/edge.webp',
+				'mask-center-round': '/assets/center-round.png',
+				'mask-center-square': '/assets/center-square.png'
+			};
+
+			function loadImg(src) {
+				return new Promise(function(resolve) {
+					var img = new Image();
+					img.crossOrigin = 'anonymous';
+					img.onload = function() { resolve(img); };
+					img.onerror = function() { resolve(null); };
+					img.src = src;
+				});
+			}
+
+			var maskElements = shadow.querySelectorAll('.mask-base');
+			var replacements = [];
+
+			for (var i = 0; i < maskElements.length; i++) {
+				var maskEl = maskElements[i];
+				var page = maskEl.closest('.page');
+				if (!page) continue;
+				var pageW = page.offsetWidth;
+				var pageH = page.offsetHeight;
+
+				var maskUrl = null;
+				for (var cls in maskImageMap) {
+					if (maskEl.classList.contains(cls)) {
+						maskUrl = maskImageMap[cls];
+						break;
+					}
+				}
+				if (!maskUrl) continue;
+
+				var contentImgEl = maskEl.querySelector('img');
+				if (!contentImgEl) continue;
+
+				var cs = window.getComputedStyle(maskEl);
+				var mpRaw = cs.getPropertyValue('mask-position') || cs.getPropertyValue('-webkit-mask-position');
+				var msRaw = cs.getPropertyValue('mask-size') || cs.getPropertyValue('-webkit-mask-size');
+
+				var mpParts = mpRaw ? mpRaw.split(/\s+/).map(parseFloat) : [pageW * 0.5, pageH * 0.5];
+				var msParts = msRaw && msRaw !== '100%' ? msRaw.split(/\s+/).map(parseFloat) : [pageW, pageH];
+
+				var imgs = await Promise.all([loadImg(maskUrl), loadImg(contentImgEl.src)]);
+				var maskImg = imgs[0], contentImg = imgs[1];
+				if (!maskImg || !contentImg) continue;
+
+				var canvas = document.createElement('canvas');
+				canvas.width = pageW;
+				canvas.height = pageH;
+				var ctx = canvas.getContext('2d');
+
+				ctx.drawImage(maskImg, mpParts[0], mpParts[1], msParts[0], msParts[1]);
+				ctx.globalCompositeOperation = 'source-in';
+				ctx.drawImage(contentImg,
+					parseFloat(contentImgEl.style.left),
+					parseFloat(contentImgEl.style.top),
+					parseFloat(contentImgEl.style.width),
+					parseFloat(contentImgEl.style.height)
+				);
+
+				try {
+					var dataUrl = canvas.toDataURL('image/png');
+					var replacement = document.createElement('img');
+					replacement.src = dataUrl;
+					replacement.style.cssText = 'position:absolute;top:0;left:0;width:' + pageW + 'px;height:' + pageH + 'px;z-index:' + (maskEl.style.zIndex || 10) + ';';
+					replacements.push({ parent: maskEl.parentNode, maskEl: maskEl, replacement: replacement });
+					maskEl.parentNode.replaceChild(replacement, maskEl);
+				} catch(e) {
+					// Canvas tainted by cross-origin image, skip rasterization
+				}
+			}
 
 			var links = '';
 			document.querySelectorAll('head link[rel="stylesheet"]').forEach(function(link) {
