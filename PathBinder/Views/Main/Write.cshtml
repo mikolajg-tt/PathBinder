@@ -1002,14 +1002,9 @@
 		function replaceFrames(page) {
 			let usedFrame = false;
 			return page.replace(/{{imageMaskEdge[\s\S]*?}}/g, (block) => {
-				const urlMatch = block.match(/\!\[.*?\]\(([^)]+)\)/);
-				const url = (urlMatch ? urlMatch[1] : '').trim();
-				if (url === '') {
-					usedFrame = true;
-				}
 				if (!usedFrame) {
 					usedFrame = true;
-					return `{{frame ${url}}}`;
+					return `{{frame ${DEFAULT_FRAME}[mask-image=none]}}`;
 				}
 				return '';
 			});
