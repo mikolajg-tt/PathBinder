@@ -139,7 +139,7 @@
 	const DEFAULT_FRAME = 'https://i.imgur.com/s75LEm3.png';
 
 	function getCreditsPage(title) {
-		return `{{frame ${DEFAULT_FRAME}[mask-image=none, class=base]}}
+		return `{{frame ${DEFAULT_FRAME}[mask-image=none, class=base, column-gap=27px]}}
 # Credits
 {{paragraph **Some artwork © Dean Spencer, used with permission. All rights reserved.**}}
 {{line **Some artwork copyright Murzabaev Roman aka s0ulafein,**}}
@@ -1005,7 +1005,7 @@
 			return page.replace(/{{imageMaskEdge[\s\S]*?}}/g, (block) => {
 				if (!usedFrame) {
 					usedFrame = true;
-					return `{{frame ${DEFAULT_FRAME}[mask-image=none]}}`;
+					return `{{frame ${DEFAULT_FRAME}[mask-image=none,class=base,column-gap=27px]}}`;
 				}
 				return '';
 			});
