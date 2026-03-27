@@ -51,7 +51,22 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/search/jump-to-line.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js"></script>
 <script>
-	const defaultStyles = { actionColor: 'dark', pageNumberOffset: 50, pageNumberFlipped: false };
+	const defaultStyles = {
+		actionColor: 'dark',
+		pageNumberOffset: 50,
+		pageNumberFlipped: false,
+		tocColumns: 2,
+		tocDensity: 28,
+		tocSpacing: 0,
+		tocSectionColor: '#58180D',
+		tocSubsectionColor: '#58180D',
+		tocTitleColor: '#333333',
+		tocDotColor: '#999999',
+		tocPageNumColor: '#58180D',
+		tocSectionSize: 24,
+		tocSubsectionSize: 18,
+		tocTitleSize: 12
+	};
 	let fileStyles = { ...defaultStyles };
 
 	function actionTag(name) {
@@ -64,72 +79,247 @@
 		saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>Save';
 	}
 
+	let tocStylesDirty = false;
+
+	function isValidColor(str) {
+		const s = new Option().style;
+		s.color = str;
+		return s.color !== '';
+	}
+
+	function toHex(color) {
+		const ctx = document.createElement('canvas').getContext('2d');
+		ctx.fillStyle = color;
+		return ctx.fillStyle;
+	}
+
 	function populateStyleMenu() {
 		const menu = document.getElementById('styleMenu');
 		menu.innerHTML = '';
 
-		const actionColorBtn = document.createElement('button');
-		actionColorBtn.id = 'styleActionColor';
-		actionColorBtn.textContent = `Action Color: ${fileStyles.actionColor === 'white' ? 'White' : 'Dark'}`;
-		actionColorBtn.onclick = () => {
+		// ── Header ──
+		const header = document.createElement('div');
+		header.className = 'style-menu-header';
+		const h3 = document.createElement('h3');
+		h3.textContent = 'Style Settings';
+		header.appendChild(h3);
+		const closeBtn = document.createElement('button');
+		closeBtn.className = 'style-menu-close';
+		closeBtn.textContent = '\u00d7';
+		closeBtn.onclick = () => toggleStyleMenu();
+		header.appendChild(closeBtn);
+		menu.appendChild(header);
+
+		// ── Tabs ──
+		const tabDefs = [
+			{ id: 'general', label: 'General' },
+			{ id: 'contents', label: 'Contents Page' }
+		];
+		const tabStrip = document.createElement('div');
+		tabStrip.className = 'style-menu-tabs';
+		const panels = document.createElement('div');
+		panels.className = 'style-menu-panels';
+		const panelEls = {};
+
+		tabDefs.forEach((def, idx) => {
+			const tab = document.createElement('button');
+			tab.className = 'style-menu-tab' + (idx === 0 ? ' active' : '');
+			tab.textContent = def.label;
+			tab.onclick = () => {
+				tabStrip.querySelectorAll('.style-menu-tab').forEach(t => t.classList.remove('active'));
+				tab.classList.add('active');
+				Object.values(panelEls).forEach(p => p.classList.remove('active'));
+				panelEls[def.id].classList.add('active');
+			};
+			tabStrip.appendChild(tab);
+
+			const panel = document.createElement('div');
+			panel.className = 'style-menu-panel' + (idx === 0 ? ' active' : '');
+			panelEls[def.id] = panel;
+			panels.appendChild(panel);
+		});
+
+		menu.appendChild(tabStrip);
+		menu.appendChild(panels);
+
+		// ── Helpers ──
+		function addSlider(container, label, key, min, max, opts = {}) {
+			const { suffix = '', immediate = true, tocLive = false } = opts;
+			const row = document.createElement('div');
+			row.className = 'sm-row';
+			const lbl = document.createElement('span');
+			lbl.className = 'sm-label';
+			lbl.textContent = label;
+			row.appendChild(lbl);
+			const controlRow = document.createElement('div');
+			controlRow.className = 'sm-slider-row';
+			const sl = document.createElement('input');
+			sl.type = 'range';
+			sl.min = min;
+			sl.max = max;
+			sl.value = fileStyles[key];
+			const numInput = document.createElement('input');
+			numInput.type = 'number';
+			numInput.min = min;
+			numInput.max = max;
+			numInput.value = fileStyles[key];
+			function update(val) {
+				const clamped = Math.max(min, Math.min(max, parseInt(val) || min));
+				fileStyles[key] = clamped;
+				sl.value = clamped;
+				numInput.value = clamped;
+				markUnsaved();
+				if (immediate) {
+					cachedPageTexts = [];
+					displayChange();
+				} else {
+					tocStylesDirty = true;
+					if (tocLive) updateTocLive();
+				}
+			}
+			sl.oninput = () => update(sl.value);
+			numInput.oninput = () => update(numInput.value);
+			controlRow.appendChild(sl);
+			controlRow.appendChild(numInput);
+			if (suffix) {
+				const suf = document.createElement('span');
+				suf.className = 'sm-suffix';
+				suf.textContent = suffix;
+				controlRow.appendChild(suf);
+			}
+			row.appendChild(controlRow);
+			container.appendChild(row);
+		}
+
+		function addColorInput(container, label, key, opts = {}) {
+			const { immediate = true, tocLive = false } = opts;
+			const row = document.createElement('div');
+			row.className = 'sm-row';
+			const lbl = document.createElement('span');
+			lbl.className = 'sm-label';
+			lbl.textContent = label;
+			row.appendChild(lbl);
+			const controlRow = document.createElement('div');
+			controlRow.className = 'sm-color-row';
+			const textInput = document.createElement('input');
+			textInput.type = 'text';
+			textInput.value = fileStyles[key];
+			const swatch = document.createElement('input');
+			swatch.type = 'color';
+			swatch.className = 'sm-color-swatch';
+			swatch.value = toHex(fileStyles[key]);
+			function applyColor(val) {
+				fileStyles[key] = val;
+				markUnsaved();
+				if (immediate) {
+					cachedPageTexts = [];
+					displayChange();
+				} else {
+					tocStylesDirty = true;
+					if (tocLive) updateTocLive();
+				}
+			}
+			swatch.oninput = () => {
+				textInput.value = swatch.value;
+				applyColor(swatch.value);
+			};
+			textInput.onblur = () => {
+				if (isValidColor(textInput.value)) {
+					swatch.value = toHex(textInput.value);
+					applyColor(textInput.value);
+				} else {
+					textInput.value = fileStyles[key];
+				}
+			};
+			textInput.onkeydown = (e) => {
+				if (e.key === 'Enter') textInput.blur();
+			};
+			controlRow.appendChild(textInput);
+			controlRow.appendChild(swatch);
+			row.appendChild(controlRow);
+			container.appendChild(row);
+		}
+
+		function addCheckbox(container, label, key, onChange) {
+			const row = document.createElement('label');
+			row.className = 'sm-toggle-row';
+			const cb = document.createElement('input');
+			cb.type = 'checkbox';
+			cb.checked = fileStyles[key];
+			cb.onchange = () => onChange(cb.checked);
+			row.appendChild(cb);
+			row.appendChild(document.createTextNode(label));
+			container.appendChild(row);
+		}
+
+		// ── General Tab ──
+		const gen = panelEls['general'];
+
+		const actionRow = document.createElement('div');
+		actionRow.className = 'sm-row';
+		const actionLabel = document.createElement('span');
+		actionLabel.className = 'sm-label';
+		actionLabel.textContent = 'Action Color';
+		actionRow.appendChild(actionLabel);
+		const actionBtn = document.createElement('button');
+		actionBtn.className = 'sm-button';
+		const actionState = document.createElement('span');
+		actionState.className = 'sm-button-state';
+		actionState.textContent = fileStyles.actionColor === 'white' ? 'White' : 'Dark';
+		actionBtn.appendChild(actionState);
+		actionBtn.onclick = () => {
 			fileStyles.actionColor = fileStyles.actionColor === 'white' ? 'dark' : 'white';
-			actionColorBtn.textContent = `Action Color: ${fileStyles.actionColor === 'white' ? 'White' : 'Dark'}`;
+			actionState.textContent = fileStyles.actionColor === 'white' ? 'White' : 'Dark';
 			markUnsaved();
 		};
-		menu.appendChild(actionColorBtn);
+		actionRow.appendChild(actionBtn);
+		gen.appendChild(actionRow);
 
-		const sliderLabel = document.createElement('label');
-		sliderLabel.textContent = `Page Number Offset: ${fileStyles.pageNumberOffset}%`;
-		sliderLabel.style.display = 'block';
-		sliderLabel.style.padding = '8px';
-		menu.appendChild(sliderLabel);
+		addSlider(gen, 'Page Number Offset', 'pageNumberOffset', 0, 100, { suffix: '%', immediate: true });
 
-		const slider = document.createElement('input');
-		slider.type = 'range';
-		slider.min = 0;
-		slider.max = 100;
-		slider.value = fileStyles.pageNumberOffset;
-		slider.style.width = '100%';
-		slider.style.padding = '0 8px';
-		slider.style.boxSizing = 'border-box';
-		slider.oninput = () => {
-			fileStyles.pageNumberOffset = parseInt(slider.value);
-			sliderLabel.textContent = `Page Number Offset: ${fileStyles.pageNumberOffset}%`;
+		addCheckbox(gen, 'Flip odd/even page numbers', 'pageNumberFlipped', (checked) => {
+			fileStyles.pageNumberFlipped = checked;
 			markUnsaved();
 			cachedPageTexts = [];
 			displayChange();
-		};
-		menu.appendChild(slider);
+		});
 
-		const flipLabel = document.createElement('label');
-		flipLabel.style.display = 'flex';
-		flipLabel.style.alignItems = 'center';
-		flipLabel.style.padding = '8px';
-		flipLabel.style.gap = '8px';
-		flipLabel.style.cursor = 'pointer';
-		const flipCheckbox = document.createElement('input');
-		flipCheckbox.type = 'checkbox';
-		flipCheckbox.checked = fileStyles.pageNumberFlipped;
-		flipCheckbox.onchange = () => {
-			fileStyles.pageNumberFlipped = flipCheckbox.checked;
-			markUnsaved();
-			cachedPageTexts = [];
-			displayChange();
-		};
-		flipLabel.appendChild(flipCheckbox);
-		flipLabel.appendChild(document.createTextNode('Flip odd/even'));
-		menu.appendChild(flipLabel);
+		// ── Contents Page Tab ──
+		const toc = panelEls['contents'];
+
+		addSlider(toc, 'Columns', 'tocColumns', 1, 4, { immediate: false, tocLive: true });
+		addSlider(toc, 'Density (per column)', 'tocDensity', 10, 50, { immediate: false, tocLive: true });
+		addSlider(toc, 'Top Spacing (per column)', 'tocSpacing', 0, 20, { immediate: false, tocLive: true });
+		addSlider(toc, 'Section Font Size', 'tocSectionSize', 8, 48, { suffix: 'px', immediate: false, tocLive: true });
+		addSlider(toc, 'Subsection Font Size', 'tocSubsectionSize', 8, 36, { suffix: 'px', immediate: false, tocLive: true });
+		addSlider(toc, 'Title Font Size', 'tocTitleSize', 8, 36, { suffix: 'px', immediate: false, tocLive: true });
+		addColorInput(toc, 'Section Color', 'tocSectionColor', { immediate: false, tocLive: true });
+		addColorInput(toc, 'Subsection Color', 'tocSubsectionColor', { immediate: false, tocLive: true });
+		addColorInput(toc, 'Title Color', 'tocTitleColor', { immediate: false, tocLive: true });
+		addColorInput(toc, 'Dot Color', 'tocDotColor', { immediate: false, tocLive: true });
+		addColorInput(toc, 'Page Number Color', 'tocPageNumColor', { immediate: false, tocLive: true });
 	}
 
 	function toggleStyleMenu() {
 		const menu = document.getElementById('styleMenu');
+		const wasVisible = !menu.classList.contains('hidden');
 		menu.classList.toggle('hidden');
+		if (wasVisible && tocStylesDirty) {
+			tocStylesDirty = false;
+			rebuildToc();
+			displayChange();
+		}
 	}
 
 	function applyStyles(stylesJson) {
 		try {
 			const parsed = JSON.parse(stylesJson);
 			fileStyles = { ...defaultStyles, ...parsed };
+			// Migrate old em-based font sizes to px
+			const sizeKeys = ['tocSectionSize', 'tocSubsectionSize', 'tocTitleSize'];
+			for (const k of sizeKeys) {
+				if (fileStyles[k] < 8) fileStyles[k] = defaultStyles[k];
+			}
 		} catch {
 			fileStyles = { ...defaultStyles };
 		}
@@ -155,6 +345,9 @@
 			"image": { "html": "img", "classes": ["image"] },
 			"frame": { "html": "img" },
 			"title": { "html": "h1", "classes": ["wide", "title"] },
+			"section": { "html": "h1", "classes": ["wide", "title"] },
+			"subsection": { "html": "h1", "classes": ["wide", "title"] },
+			"contents": { "special": true },
 			"header": { "html": "header", "classes": ["wide", "subtitle"] },
 			"line": { "html": "p", "classes": ["line"] },
 			"paragraph": { "html": "p", "classes": ["paragraph"] },
@@ -270,6 +463,8 @@
 		const pageStyle = document.createElement('style');
 		pageStyle.textContent = [...styleSheet.cssRules].map(rule => rule.cssText).join('\n');
 		shadow.appendChild(pageStyle);
+		const tocDynamicStyle = document.createElement('style');
+		shadow.appendChild(tocDynamicStyle);
 		editor.on('change', function () {
 			if (autosaveTimeout) {
 				clearTimeout(autosaveTimeout);
@@ -1309,7 +1504,7 @@
 						else if (elementName === "table" && key === "headerColor") {
 							newElement.style.setProperty('--header-color', value);
 						}
-						else if (elementName === "title" && key === "text-shadow") {
+						else if ((elementName === "title" || elementName === "section" || elementName === "subsection") && key === "text-shadow") {
 							newElement.style.setProperty("text-shadow", `-3px -3px 0 ${value}, 0px -3px 0 ${value}, 3px -3px 0 ${value}, -3px 0px 0 ${value}, 3px 0px 0 ${value}, -3px 3px 0 ${value}, 0px 3px 0 ${value}, 3px 3px 0 ${value}, -2px -2px 0 ${value}, 2px -2px 0 ${value}, -2px 2px 0 ${value}, 2px 2px 0 ${value}`);
 						}
 						else if (key in assignMap) {
@@ -1490,8 +1685,235 @@
 			return element;
 		}
 
+		const TOC_ENTRIES_PER_COLUMN = 28;
+
+		function collectTitles(rawText) {
+			const pages = rawText.split("{{pagebreak}}");
+			const titles = [];
+			let firstTitleSkipped = false;
+
+			for (let i = 0; i < pages.length; i++) {
+				const tagRegex = /\{\{(section|subsection|title)\s+([\s\S]*?)(?:\[(.*?)\])?\s*\}\}/g;
+				let match;
+				while ((match = tagRegex.exec(pages[i])) !== null) {
+					const type = match[1];
+					const text = match[2].trim();
+					const attrs = match[3] || "";
+
+					if (type === "title" && !firstTitleSkipped && i === 0) {
+						firstTitleSkipped = true;
+						continue;
+					}
+
+					if (/toc\s*=\s*false/i.test(attrs)) {
+						continue;
+					}
+
+					titles.push({ type, text, originalPageIndex: i });
+				}
+			}
+			return titles;
+		}
+
+		function buildTocEntries(titles, tocInsertIndex, tocPageCount) {
+			const entries = [];
+			for (const t of titles) {
+				let pageNum = t.originalPageIndex + 1;
+				if (t.originalPageIndex > tocInsertIndex) {
+					pageNum += tocPageCount - 1;
+				}
+				const cls = t.type === "section" ? "toc-section"
+						: t.type === "subsection" ? "toc-subsection"
+						: "toc-entry";
+				entries.push({
+					type: t.type,
+					html: `<div class="${cls}">` +
+						`<span class="toc-text">${t.text}</span>` +
+						`<span class="toc-dots"></span>` +
+						`<span class="toc-page">${pageNum}</span>` +
+						`</div>`
+				});
+			}
+			return entries;
+		}
+
+		function groupTocEntries(entries) {
+			// Group by subsection: each group = [subsection, title, title, ...]
+			// Sections are standalone single-entry groups
+			// Titles before any subsection form their own group
+			const groups = [];
+			let current = null;
+			for (const e of entries) {
+				if (e.type === "section") {
+					if (current) groups.push(current);
+					groups.push([e]);
+					current = null;
+				} else if (e.type === "subsection") {
+					if (current) groups.push(current);
+					current = [e];
+				} else {
+					if (!current) current = [];
+					current.push(e);
+				}
+			}
+			if (current && current.length > 0) groups.push(current);
+			return groups;
+		}
+
+		function packTocColumns(groups, entriesPerCol, tocCols) {
+			// Merge section groups with the following group so they stay together
+			const merged = [];
+			for (let i = 0; i < groups.length; i++) {
+				const isSection = groups[i].length === 1 && groups[i][0].type === "section";
+				if (isSection && i + 1 < groups.length) {
+					merged.push([...groups[i], ...groups[i + 1]]);
+					i++; // skip next group, already merged
+				} else {
+					merged.push(groups[i]);
+				}
+			}
+
+			const columns = [];
+			let col = [];
+			let colCount = 0;
+
+			for (const group of merged) {
+				// If adding this group would exceed density and column isn't empty,
+				// push current column and start a new one
+				if (colCount > 0 && colCount + group.length > entriesPerCol) {
+					columns.push(col);
+					col = [];
+					colCount = 0;
+				}
+				col.push(...group);
+				colCount += group.length;
+			}
+			if (col.length > 0) columns.push(col);
+			return columns;
+		}
+
+		function generateTocPages(titles, tocInsertIndex, tocPageCount, entriesPerCol, topSpacing, tocCols) {
+			entriesPerCol = entriesPerCol || TOC_ENTRIES_PER_COLUMN;
+			topSpacing = topSpacing || 0;
+			tocCols = tocCols || 2;
+			if (titles.length === 0) return "";
+
+			const entries = buildTocEntries(titles, tocInsertIndex, tocPageCount);
+			const groups = groupTocEntries(entries);
+			const columns = packTocColumns(groups, entriesPerCol, tocCols);
+
+			const spacer = topSpacing > 0 ? `{{paragraph ${":".repeat(topSpacing)}}}\n\n` : "";
+			const tocMarker = '<div class="toc-marker" style="display:none"></div>\n';
+			const tocPages = [];
+			for (let i = 0; i < columns.length; i += tocCols) {
+				const pageCols = columns.slice(i, i + tocCols);
+				const colHtmls = pageCols.map(col =>
+					spacer + col.map(e => e.html).join("\n")
+				);
+				tocPages.push(tocMarker + colHtmls.join("\n{{columnbreak}}\n"));
+			}
+			return tocPages.join("\n{{pagebreak}}\n");
+		}
+
+		function updateTocStyle() {
+			const tocCols = fileStyles.tocColumns ?? 2;
+			tocDynamicStyle.textContent = `:host {` +
+				`--toc-section-color: ${fileStyles.tocSectionColor ?? '#58180D'};` +
+				`--toc-subsection-color: ${fileStyles.tocSubsectionColor ?? '#58180D'};` +
+				`--toc-title-color: ${fileStyles.tocTitleColor ?? '#333333'};` +
+				`--toc-dot-color: ${fileStyles.tocDotColor ?? '#999999'};` +
+				`--toc-pagenum-color: ${fileStyles.tocPageNumColor ?? '#58180D'};` +
+				`--toc-section-size: ${fileStyles.tocSectionSize ?? 24}px;` +
+				`--toc-subsection-size: ${fileStyles.tocSubsectionSize ?? 18}px;` +
+				`--toc-title-size: ${fileStyles.tocTitleSize ?? 12}px;` +
+				`}\n` +
+				`.page.toc-page, .page.toc-page .columnWrapper { column-count: ${tocCols}; }`;
+		}
+
+		function updateTocLive() {
+			const htmlContent = editor.getValue();
+			const contentsMatch = htmlContent.match(/\{\{contents\s*\}\}/);
+			if (!contentsMatch) return;
+
+			const tocCols = fileStyles.tocColumns ?? 2;
+			const entriesPerCol = fileStyles.tocDensity ?? TOC_ENTRIES_PER_COLUMN;
+			const topSpacing = fileStyles.tocSpacing ?? 0;
+
+			const titles = collectTitles(htmlContent);
+			const pageSegments = htmlContent.split("{{pagebreak}}");
+			const tocInsertIndex = pageSegments.findIndex(s => s.includes(contentsMatch[0]));
+			const tocPageCount = titles.length > 0 ? Math.max(1, Math.ceil(titles.length / (entriesPerCol * tocCols))) : 0;
+
+			const entries = buildTocEntries(titles, tocInsertIndex, tocPageCount);
+			const groups = groupTocEntries(entries);
+			const columns = packTocColumns(groups, entriesPerCol, tocCols);
+
+			const spacerHtml = topSpacing > 0 ? '<br>'.repeat(topSpacing) : '';
+			const tocPagesHtml = [];
+			for (let i = 0; i < columns.length; i += tocCols) {
+				const pageCols = columns.slice(i, i + tocCols);
+				const html = pageCols.map(col =>
+					spacerHtml + col.map(e => e.html).join('')
+				).join('');
+				tocPagesHtml.push(html);
+			}
+
+			// Update existing toc-page DOM elements directly
+			const tocPages = shadow.querySelectorAll('.page.toc-page');
+			tocPages.forEach((page, idx) => {
+				const cw = page.querySelector('.columnWrapper');
+				if (cw && tocPagesHtml[idx] !== undefined) {
+					cw.innerHTML = tocPagesHtml[idx];
+				}
+			});
+
+			// Update CSS variables + column count
+			updateTocStyle();
+		}
+
+		let cachedTocHtml = null;
+
+		function rebuildToc() {
+			const htmlContent = editor.getValue();
+			const contentsMatch = htmlContent.match(/\{\{contents\s*\}\}/);
+			if (!contentsMatch) {
+				cachedTocHtml = null;
+				tocDynamicStyle.textContent = '';
+				return;
+			}
+			const tocCols = fileStyles.tocColumns ?? 2;
+			const entriesPerCol = fileStyles.tocDensity ?? TOC_ENTRIES_PER_COLUMN;
+			const topSpacing = fileStyles.tocSpacing ?? 0;
+			const titles = collectTitles(htmlContent);
+			const pageSegments = htmlContent.split("{{pagebreak}}");
+			const tocInsertIndex = pageSegments.findIndex(s => s.includes(contentsMatch[0]));
+			// Two-pass: estimate page count, pack, then correct if actual differs
+			let tocPageCount = titles.length > 0 ? Math.max(1, Math.ceil(titles.length / (entriesPerCol * tocCols))) : 0;
+			for (let pass = 0; pass < 3; pass++) {
+				const entries = buildTocEntries(titles, tocInsertIndex, tocPageCount);
+				const groups = groupTocEntries(entries);
+				const columns = packTocColumns(groups, entriesPerCol, tocCols);
+				const actualPages = Math.max(1, Math.ceil(columns.length / tocCols));
+				if (actualPages === tocPageCount) break;
+				tocPageCount = actualPages;
+			}
+			cachedTocHtml = generateTocPages(titles, tocInsertIndex, tocPageCount, entriesPerCol, topSpacing, tocCols);
+			updateTocStyle();
+			cachedPageTexts = [];
+		}
+
 		function displayChange() {
 			let htmlContent = editor.getValue();
+
+			const contentsMatch = htmlContent.match(/\{\{contents\s*\}\}/);
+			if (contentsMatch) {
+				if (cachedTocHtml === null) rebuildToc();
+				htmlContent = htmlContent.replace(contentsMatch[0], cachedTocHtml);
+				updateTocStyle();
+			} else {
+				tocDynamicStyle.textContent = '';
+			}
+
 			let pageTexts = htmlContent.split("\{\{pagebreak\}\}");
 			let existingPages = shadow.querySelectorAll('.page');
 
@@ -1523,6 +1945,14 @@
 					a.style.backgroundColor = 'red';
 				});
 				page.appendChild(columnWrapper);
+
+				const tocMarkerEl = columnWrapper.querySelector('.toc-marker');
+				if (tocMarkerEl) {
+					page.classList.add('toc-page');
+					tocMarkerEl.remove();
+				} else {
+					page.classList.remove('toc-page');
+				}
 			}
 
 			cachedPageTexts = pageTexts;
@@ -1532,6 +1962,8 @@
 			let saveButton = document.getElementById('save');
 			if (!saveButton.disabled) {
 				saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Saving...';
+				rebuildToc();
+				displayChange();
 				saveDocument();
 				setTimeout(() => {
 					saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Saved';
@@ -1788,9 +2220,21 @@
 		function scrollToPart(mode) {
 			const doc = editor.getDoc()
 			const pageBreaks = []
-			doc.eachLine(l => { if (l.text.includes("{{pagebreak}}")) pageBreaks.push(doc.getLineNumber(l)) })
+			let tocSourcePage = -1
+			let sourcePageIdx = 0
+			doc.eachLine(l => {
+				if (l.text.includes("{{contents}}")) tocSourcePage = sourcePageIdx;
+				if (l.text.includes("{{pagebreak}}")) {
+					pageBreaks.push(doc.getLineNumber(l));
+					sourcePageIdx++;
+				}
+			})
 			const host = document.getElementById('displayAreaHolder')
 			const pages = host.shadowRoot.querySelectorAll('.page')
+			const tocExtra = (tocSourcePage >= 0 && cachedTocHtml)
+				? (pages.length - pageBreaks.length - 1)
+				: 0;
+
 			if (mode === 'editor') {
 				let idx = pages.length, closest = Number.MAX_VALUE
 				pages.forEach((p, i) => {
@@ -1798,9 +2242,18 @@
 					if (ratio < closest) { closest = ratio; idx = i }
 				})
 				if (idx === 0) { editor.scrollTo(null, 0); return }
-				idx--
-				if (idx < 0 || idx >= pageBreaks.length) return
-				const line = pageBreaks[idx]
+				// Map rendered page index to source page break index
+				let srcIdx = idx - 1;
+				if (tocExtra > 0 && idx > tocSourcePage) {
+					if (idx <= tocSourcePage + tocExtra) {
+						// Inside a TOC page — scroll to the contents tag source line
+						srcIdx = tocSourcePage > 0 ? tocSourcePage - 1 : 0;
+					} else {
+						srcIdx = idx - 1 - tocExtra;
+					}
+				}
+				if (srcIdx < 0 || srcIdx >= pageBreaks.length) return
+				const line = pageBreaks[srcIdx]
 				const { top } = editor.charCoords({ line, ch: 0 }, 'local')
 				editor.scrollTo(null, top)
 			} else {
@@ -1821,8 +2274,13 @@
 					}
 					idx = pageBreaks.length;
 				}
-				if (idx < 0 || idx >= pages.length) return
-				pages[idx].scrollIntoView()
+				// Map source page index to rendered page index
+				let renderIdx = idx;
+				if (tocExtra > 0 && idx >= tocSourcePage) {
+					renderIdx = idx + tocExtra;
+				}
+				if (renderIdx < 0 || renderIdx >= pages.length) return
+				pages[renderIdx].scrollIntoView()
 			}
 		}
 

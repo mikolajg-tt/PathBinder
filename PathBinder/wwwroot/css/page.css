@@ -366,3 +366,81 @@
 .page .unique {
     background-color: #54166E;
 }
+
+/* Table of Contents */
+.page .toc-section {
+    display: flex;
+    align-items: baseline;
+    font-family: 'Eczar', sans-serif;
+    font-weight: bold;
+    color: var(--toc-section-color, #58180D);
+    margin-bottom: 0.1em;
+    margin-top: 0.3em;
+    -webkit-text-stroke-width: 0.5px;
+    letter-spacing: 0.02em;
+    border-bottom: 2px solid var(--toc-section-color, #58180D);
+    padding-bottom: 0.1em;
+}
+
+.page .toc-section .toc-text {
+    white-space: nowrap;
+    font-size: var(--toc-section-size, 24px);
+}
+
+.page .toc-section .toc-dots {
+    flex: 1;
+    border-bottom: none;
+}
+
+.page .toc-section .toc-page {
+    white-space: nowrap;
+    font-weight: bold;
+    font-size: var(--toc-section-size, 24px);
+    color: var(--toc-pagenum-color, #58180D);
+}
+
+.page .toc-subsection {
+    display: flex;
+    align-items: baseline;
+    font-family: 'Eczar', sans-serif;
+    font-weight: bold;
+    color: var(--toc-subsection-color, #58180D);
+    margin-bottom: 0.2em;
+    margin-top: 0.15em;
+    -webkit-text-stroke-width: 0.5px;
+}
+
+.page .toc-subsection .toc-text {
+    white-space: nowrap;
+    font-size: var(--toc-subsection-size, 18px);
+}
+
+.page .toc-entry {
+    display: flex;
+    align-items: baseline;
+    margin-left: 1em;
+    font-family: 'Teko', sans-serif;
+    line-height: 1.8;
+    color: var(--toc-title-color, #333);
+}
+
+.page .toc-entry .toc-text {
+    white-space: nowrap;
+    font-size: var(--toc-title-size, 12px);
+}
+
+.page .toc-entry .toc-dots,
+.page .toc-subsection .toc-dots {
+    flex: 1;
+    border-bottom: 1px dotted var(--toc-dot-color, #999);
+    margin: 0 4px;
+    position: relative;
+    top: -3px;
+}
+
+.page .toc-entry .toc-page,
+.page .toc-subsection .toc-page {
+    white-space: nowrap;
+    font-weight: bold;
+    color: var(--toc-pagenum-color, #58180D);
+}
