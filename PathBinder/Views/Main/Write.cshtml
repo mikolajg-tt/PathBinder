@@ -15,15 +15,17 @@
 				<button onclick="printDocument()"><i class="fa-solid fa-print"></i>Print</button>
 				<button onclick="toggleStyleMenu()"><i class="fa-solid fa-palette"></i>Style Menu</button>
 			</div>
-			<div id="styleMenu" class="style-menu hidden">
-			</div>
 			<div class="dropdown">
 				<button class="dropdownButton"><i class="fa-solid fa-bars"></i>Elements</button>
 				<div class="dropdownContainer hidden">
 				</div>
 			</div>
 		</nav>
-		<div id="writeArea">
+		<div id="writeAreaWrapper">
+			<div id="writeArea">
+			</div>
+			<div id="styleMenu" class="style-menu hidden">
+			</div>
 		</div>
 	</div>
 	<div class="resizer">
@@ -62,10 +64,15 @@
 		tocSubsectionColor: '#58180D',
 		tocTitleColor: '#333333',
 		tocDotColor: '#999999',
-		tocPageNumColor: '#58180D',
+		tocSectionPageNumColor: '#58180D',
+		tocSubsectionPageNumColor: '#58180D',
+		tocTitlePageNumColor: '#58180D',
 		tocSectionSize: 24,
 		tocSubsectionSize: 18,
-		tocTitleSize: 12
+		tocTitleSize: 12,
+		tocSectionPageNumSize: 24,
+		tocSubsectionPageNumSize: 18,
+		tocTitlePageNumSize: 12
 	};
 	let fileStyles = { ...defaultStyles };
 
@@ -97,77 +104,70 @@
 		const menu = document.getElementById('styleMenu');
 		menu.innerHTML = '';
 
-		// ── Header ──
-		const header = document.createElement('div');
-		header.className = 'style-menu-header';
-		const h3 = document.createElement('h3');
-		h3.textContent = 'Style Settings';
-		header.appendChild(h3);
-		const closeBtn = document.createElement('button');
-		closeBtn.className = 'style-menu-close';
-		closeBtn.textContent = '\u00d7';
-		closeBtn.onclick = () => toggleStyleMenu();
-		header.appendChild(closeBtn);
-		menu.appendChild(header);
+		// ── Tab bar ──
+		const tabBar = document.createElement('div');
+		tabBar.className = 'sm-tab-bar';
 
-		// ── Tabs ──
 		const tabDefs = [
-			{ id: 'general', label: 'General' },
-			{ id: 'contents', label: 'Contents Page' }
+			{ id: 'action', label: 'Action Colour', icon: 'fa-palette' },
+			{ id: 'pagenums', label: 'Page Numbers', icon: 'fa-hashtag' },
+			{ id: 'contents', label: 'Contents Page', icon: 'fa-book-open' }
 		];
-		const tabStrip = document.createElement('div');
-		tabStrip.className = 'style-menu-tabs';
-		const panels = document.createElement('div');
-		panels.className = 'style-menu-panels';
+
+		const panelContainer = document.createElement('div');
+		panelContainer.className = 'sm-panel-container';
 		const panelEls = {};
 
 		tabDefs.forEach((def, idx) => {
 			const tab = document.createElement('button');
-			tab.className = 'style-menu-tab' + (idx === 0 ? ' active' : '');
-			tab.textContent = def.label;
+			tab.className = 'sm-tab' + (idx === 0 ? ' active' : '');
+			tab.innerHTML = '<i class="fa-solid ' + def.icon + '"></i>' + def.label;
 			tab.onclick = () => {
-				tabStrip.querySelectorAll('.style-menu-tab').forEach(t => t.classList.remove('active'));
+				tabBar.querySelectorAll('.sm-tab').forEach(t => t.classList.remove('active'));
 				tab.classList.add('active');
 				Object.values(panelEls).forEach(p => p.classList.remove('active'));
 				panelEls[def.id].classList.add('active');
 			};
-			tabStrip.appendChild(tab);
+			tabBar.appendChild(tab);
 
 			const panel = document.createElement('div');
-			panel.className = 'style-menu-panel' + (idx === 0 ? ' active' : '');
+			panel.className = 'sm-panel' + (idx === 0 ? ' active' : '');
 			panelEls[def.id] = panel;
-			panels.appendChild(panel);
+			panelContainer.appendChild(panel);
 		});
 
-		menu.appendChild(tabStrip);
-		menu.appendChild(panels);
+		menu.appendChild(tabBar);
+		menu.appendChild(panelContainer);
 
 		// ── Helpers ──
-		function addSlider(container, label, key, min, max, opts = {}) {
-			const { suffix = '', immediate = true, tocLive = false } = opts;
+		function addSectionHeading(container, text) {
+			const h = document.createElement('div');
+			h.className = 'sm-section-heading';
+			h.textContent = text;
+			container.appendChild(h);
+		}
+
+		function addNumberInput(container, label, key, opts = {}) {
+			const { min, max, suffix = '', immediate = true, tocLive = false } = opts;
 			const row = document.createElement('div');
 			row.className = 'sm-row';
 			const lbl = document.createElement('span');
 			lbl.className = 'sm-label';
 			lbl.textContent = label;
 			row.appendChild(lbl);
-			const controlRow = document.createElement('div');
-			controlRow.className = 'sm-slider-row';
-			const sl = document.createElement('input');
-			sl.type = 'range';
-			sl.min = min;
-			sl.max = max;
-			sl.value = fileStyles[key];
 			const numInput = document.createElement('input');
 			numInput.type = 'number';
-			numInput.min = min;
-			numInput.max = max;
+			numInput.className = 'sm-num';
+			if (min !== undefined) numInput.min = min;
+			if (max !== undefined) numInput.max = max;
 			numInput.value = fileStyles[key];
-			function update(val) {
-				const clamped = Math.max(min, Math.min(max, parseInt(val) || min));
-				fileStyles[key] = clamped;
-				sl.value = clamped;
-				numInput.value = clamped;
+			numInput.oninput = () => {
+				let val = parseInt(numInput.value);
+				if (isNaN(val)) return;
+				if (min !== undefined) val = Math.max(min, val);
+				if (max !== undefined) val = Math.min(max, val);
+				fileStyles[key] = val;
+				numInput.value = val;
 				markUnsaved();
 				if (immediate) {
 					cachedPageTexts = [];
@@ -176,38 +176,28 @@
 					tocStylesDirty = true;
 					if (tocLive) updateTocLive();
 				}
-			}
-			sl.oninput = () => update(sl.value);
-			numInput.oninput = () => update(numInput.value);
-			controlRow.appendChild(sl);
-			controlRow.appendChild(numInput);
-			if (suffix) {
-				const suf = document.createElement('span');
-				suf.className = 'sm-suffix';
-				suf.textContent = suffix;
-				controlRow.appendChild(suf);
-			}
-			row.appendChild(controlRow);
+			};
+			row.appendChild(numInput);
 			container.appendChild(row);
 		}
 
 		function addColorInput(container, label, key, opts = {}) {
 			const { immediate = true, tocLive = false } = opts;
 			const row = document.createElement('div');
-			row.className = 'sm-row';
+			row.className = 'sm-row sm-color-row';
 			const lbl = document.createElement('span');
 			lbl.className = 'sm-label';
 			lbl.textContent = label;
-			row.appendChild(lbl);
-			const controlRow = document.createElement('div');
-			controlRow.className = 'sm-color-row';
-			const textInput = document.createElement('input');
-			textInput.type = 'text';
-			textInput.value = fileStyles[key];
+			const controls = document.createElement('div');
+			controls.className = 'sm-color-controls';
 			const swatch = document.createElement('input');
 			swatch.type = 'color';
-			swatch.className = 'sm-color-swatch';
+			swatch.className = 'sm-swatch';
 			swatch.value = toHex(fileStyles[key]);
+			const textInput = document.createElement('input');
+			textInput.type = 'text';
+			textInput.className = 'sm-color-text';
+			textInput.value = fileStyles[key];
 			function applyColor(val) {
 				fileStyles[key] = val;
 				markUnsaved();
@@ -234,50 +224,76 @@
 			textInput.onkeydown = (e) => {
 				if (e.key === 'Enter') textInput.blur();
 			};
-			controlRow.appendChild(textInput);
-			controlRow.appendChild(swatch);
-			row.appendChild(controlRow);
+			controls.appendChild(swatch);
+			controls.appendChild(textInput);
+			row.appendChild(lbl);
+			row.appendChild(controls);
 			container.appendChild(row);
 		}
 
-		function addCheckbox(container, label, key, onChange) {
+		function addToggle(container, label, key, onChange) {
 			const row = document.createElement('label');
-			row.className = 'sm-toggle-row';
-			const cb = document.createElement('input');
-			cb.type = 'checkbox';
-			cb.checked = fileStyles[key];
-			cb.onchange = () => onChange(cb.checked);
-			row.appendChild(cb);
-			row.appendChild(document.createTextNode(label));
+			row.className = 'sm-row sm-toggle';
+			const lbl = document.createElement('span');
+			lbl.className = 'sm-label';
+			lbl.textContent = label;
+			const track = document.createElement('div');
+			track.className = 'sm-switch' + (fileStyles[key] ? ' on' : '');
+			const knob = document.createElement('div');
+			knob.className = 'sm-switch-knob';
+			track.appendChild(knob);
+			const hiddenCb = document.createElement('input');
+			hiddenCb.type = 'checkbox';
+			hiddenCb.checked = fileStyles[key];
+			hiddenCb.style.display = 'none';
+			hiddenCb.onchange = () => {
+				track.classList.toggle('on', hiddenCb.checked);
+				onChange(hiddenCb.checked);
+			};
+			row.appendChild(lbl);
+			row.appendChild(hiddenCb);
+			row.appendChild(track);
 			container.appendChild(row);
 		}
 
-		// ── General Tab ──
-		const gen = panelEls['general'];
+		function addSegmentedControl(container, label, options, currentValue, onChange) {
+			const row = document.createElement('div');
+			row.className = 'sm-row';
+			const lbl = document.createElement('span');
+			lbl.className = 'sm-label';
+			lbl.textContent = label;
+			row.appendChild(lbl);
+			const seg = document.createElement('div');
+			seg.className = 'sm-segmented';
+			options.forEach(opt => {
+				const btn = document.createElement('button');
+				btn.className = 'sm-seg-btn' + (opt.value === currentValue ? ' active' : '');
+				btn.textContent = opt.label;
+				btn.onclick = () => {
+					seg.querySelectorAll('.sm-seg-btn').forEach(b => b.classList.remove('active'));
+					btn.classList.add('active');
+					onChange(opt.value);
+				};
+				seg.appendChild(btn);
+			});
+			row.appendChild(seg);
+			container.appendChild(row);
+		}
 
-		const actionRow = document.createElement('div');
-		actionRow.className = 'sm-row';
-		const actionLabel = document.createElement('span');
-		actionLabel.className = 'sm-label';
-		actionLabel.textContent = 'Action Color';
-		actionRow.appendChild(actionLabel);
-		const actionBtn = document.createElement('button');
-		actionBtn.className = 'sm-button';
-		const actionState = document.createElement('span');
-		actionState.className = 'sm-button-state';
-		actionState.textContent = fileStyles.actionColor === 'white' ? 'White' : 'Dark';
-		actionBtn.appendChild(actionState);
-		actionBtn.onclick = () => {
-			fileStyles.actionColor = fileStyles.actionColor === 'white' ? 'dark' : 'white';
-			actionState.textContent = fileStyles.actionColor === 'white' ? 'White' : 'Dark';
+		// ── Action Colour Tab ──
+		const actionPanel = panelEls['action'];
+		addSegmentedControl(actionPanel, 'Action Color', [
+			{ label: 'Dark', value: 'dark' },
+			{ label: 'White', value: 'white' }
+		], fileStyles.actionColor, (val) => {
+			fileStyles.actionColor = val;
 			markUnsaved();
-		};
-		actionRow.appendChild(actionBtn);
-		gen.appendChild(actionRow);
+		});
 
-		addSlider(gen, 'Page Number Offset', 'pageNumberOffset', 0, 100, { suffix: '%', immediate: true });
-
-		addCheckbox(gen, 'Flip odd/even page numbers', 'pageNumberFlipped', (checked) => {
+		// ── Page Numbers Tab ──
+		const pageNumPanel = panelEls['pagenums'];
+		addNumberInput(pageNumPanel, 'Offset', 'pageNumberOffset', { min: 0, max: 100, suffix: '%', immediate: true });
+		addToggle(pageNumPanel, 'Flip odd/even', 'pageNumberFlipped', (checked) => {
 			fileStyles.pageNumberFlipped = checked;
 			markUnsaved();
 			cachedPageTexts = [];
@@ -285,41 +301,86 @@
 		});
 
 		// ── Contents Page Tab ──
-		const toc = panelEls['contents'];
+		const tocPanel = panelEls['contents'];
 
-		addSlider(toc, 'Columns', 'tocColumns', 1, 4, { immediate: false, tocLive: true });
-		addSlider(toc, 'Density (per column)', 'tocDensity', 10, 50, { immediate: false, tocLive: true });
-		addSlider(toc, 'Top Spacing (per column)', 'tocSpacing', 0, 20, { immediate: false, tocLive: true });
-		addSlider(toc, 'Section Font Size', 'tocSectionSize', 8, 48, { suffix: 'px', immediate: false, tocLive: true });
-		addSlider(toc, 'Subsection Font Size', 'tocSubsectionSize', 8, 36, { suffix: 'px', immediate: false, tocLive: true });
-		addSlider(toc, 'Title Font Size', 'tocTitleSize', 8, 36, { suffix: 'px', immediate: false, tocLive: true });
-		addColorInput(toc, 'Section Color', 'tocSectionColor', { immediate: false, tocLive: true });
-		addColorInput(toc, 'Subsection Color', 'tocSubsectionColor', { immediate: false, tocLive: true });
-		addColorInput(toc, 'Title Color', 'tocTitleColor', { immediate: false, tocLive: true });
-		addColorInput(toc, 'Dot Color', 'tocDotColor', { immediate: false, tocLive: true });
-		addColorInput(toc, 'Page Number Color', 'tocPageNumColor', { immediate: false, tocLive: true });
+		addSectionHeading(tocPanel, 'Layout');
+		const layoutGrid = document.createElement('div');
+		layoutGrid.className = 'sm-grid sm-grid-3';
+		addNumberInput(layoutGrid, 'Columns', 'tocColumns', { immediate: false, tocLive: true });
+		addNumberInput(layoutGrid, 'Lines Per Column', 'tocDensity', { immediate: false, tocLive: true });
+		addNumberInput(layoutGrid, 'Top Spacing', 'tocSpacing', { immediate: false, tocLive: true });
+		tocPanel.appendChild(layoutGrid);
+
+		addSectionHeading(tocPanel, 'Typography');
+		const typeGrid = document.createElement('div');
+		typeGrid.className = 'sm-grid sm-grid-3';
+		addNumberInput(typeGrid, 'Section Font Size', 'tocSectionSize', { suffix: 'px', immediate: false, tocLive: true });
+		addNumberInput(typeGrid, 'Subsection Font Size', 'tocSubsectionSize', { suffix: 'px', immediate: false, tocLive: true });
+		addNumberInput(typeGrid, 'Title Font Size', 'tocTitleSize', { suffix: 'px', immediate: false, tocLive: true });
+		addNumberInput(typeGrid, 'Section Page Number Font Size', 'tocSectionPageNumSize', { suffix: 'px', immediate: false, tocLive: true });
+		addNumberInput(typeGrid, 'Subsection Page Number Font Size', 'tocSubsectionPageNumSize', { suffix: 'px', immediate: false, tocLive: true });
+		addNumberInput(typeGrid, 'Title Page Number Font Size', 'tocTitlePageNumSize', { suffix: 'px', immediate: false, tocLive: true });
+		tocPanel.appendChild(typeGrid);
+
+		addSectionHeading(tocPanel, 'Colors');
+		const colorGrid = document.createElement('div');
+		colorGrid.className = 'sm-grid sm-grid-4';
+		addColorInput(colorGrid, 'Section', 'tocSectionColor', { immediate: false, tocLive: true });
+		addColorInput(colorGrid, 'Subsection', 'tocSubsectionColor', { immediate: false, tocLive: true });
+		addColorInput(colorGrid, 'Title', 'tocTitleColor', { immediate: false, tocLive: true });
+		addColorInput(colorGrid, 'Dots', 'tocDotColor', { immediate: false, tocLive: true });
+		addColorInput(colorGrid, 'Section Page Number', 'tocSectionPageNumColor', { immediate: false, tocLive: true });
+		addColorInput(colorGrid, 'Subsection Page Number', 'tocSubsectionPageNumColor', { immediate: false, tocLive: true });
+		addColorInput(colorGrid, 'Title Page Number', 'tocTitlePageNumColor', { immediate: false, tocLive: true });
+		tocPanel.appendChild(colorGrid);
 	}
 
 	function toggleStyleMenu() {
 		const menu = document.getElementById('styleMenu');
 		const wasVisible = !menu.classList.contains('hidden');
-		menu.classList.toggle('hidden');
-		if (wasVisible && tocStylesDirty) {
-			tocStylesDirty = false;
-			rebuildToc();
-			displayChange();
+		if (!wasVisible) {
+			menu.classList.remove('hidden');
+			menu.offsetHeight;
+			menu.classList.add('visible');
+		} else {
+			menu.classList.remove('visible');
+			menu.addEventListener('transitionend', function handler() {
+				menu.removeEventListener('transitionend', handler);
+				menu.classList.add('hidden');
+			}, { once: true });
+			if (tocStylesDirty) {
+				tocStylesDirty = false;
+				rebuildToc();
+				displayChange();
+			}
 		}
 	}
+
+	document.addEventListener('keydown', (e) => {
+		if (e.key === 'Escape') {
+			const menu = document.getElementById('styleMenu');
+			if (!menu.classList.contains('hidden')) {
+				toggleStyleMenu();
+			}
+		}
+	});
 
 	function applyStyles(stylesJson) {
 		try {
 			const parsed = JSON.parse(stylesJson);
 			fileStyles = { ...defaultStyles, ...parsed };
 			// Migrate old em-based font sizes to px
-			const sizeKeys = ['tocSectionSize', 'tocSubsectionSize', 'tocTitleSize'];
+			const sizeKeys = ['tocSectionSize', 'tocSubsectionSize', 'tocTitleSize', 'tocSectionPageNumSize', 'tocSubsectionPageNumSize', 'tocTitlePageNumSize'];
 			for (const k of sizeKeys) {
 				if (fileStyles[k] < 8) fileStyles[k] = defaultStyles[k];
 			}
+			// Migrate old single tocPageNumColor to per-level colors
+			if (parsed.tocPageNumColor && !parsed.tocSectionPageNumColor) {
+				fileStyles.tocSectionPageNumColor = parsed.tocPageNumColor;
+				fileStyles.tocSubsectionPageNumColor = parsed.tocPageNumColor;
+				fileStyles.tocTitlePageNumColor = parsed.tocPageNumColor;
+			}
+			delete fileStyles.tocPageNumColor;
 		} catch {
 			fileStyles = { ...defaultStyles };
 		}
@@ -1737,58 +1798,11 @@
 			return entries;
 		}
 
-		function groupTocEntries(entries) {
-			// Group by subsection: each group = [subsection, title, title, ...]
-			// Sections are standalone single-entry groups
-			// Titles before any subsection form their own group
-			const groups = [];
-			let current = null;
-			for (const e of entries) {
-				if (e.type === "section") {
-					if (current) groups.push(current);
-					groups.push([e]);
-					current = null;
-				} else if (e.type === "subsection") {
-					if (current) groups.push(current);
-					current = [e];
-				} else {
-					if (!current) current = [];
-					current.push(e);
-				}
-			}
-			if (current && current.length > 0) groups.push(current);
-			return groups;
-		}
-
-		function packTocColumns(groups, entriesPerCol, tocCols) {
-			// Merge section groups with the following group so they stay together
-			const merged = [];
-			for (let i = 0; i < groups.length; i++) {
-				const isSection = groups[i].length === 1 && groups[i][0].type === "section";
-				if (isSection && i + 1 < groups.length) {
-					merged.push([...groups[i], ...groups[i + 1]]);
-					i++; // skip next group, already merged
-				} else {
-					merged.push(groups[i]);
-				}
-			}
-
+		function packTocColumns(entries, entriesPerCol) {
 			const columns = [];
-			let col = [];
-			let colCount = 0;
-
-			for (const group of merged) {
-				// If adding this group would exceed density and column isn't empty,
-				// push current column and start a new one
-				if (colCount > 0 && colCount + group.length > entriesPerCol) {
-					columns.push(col);
-					col = [];
-					colCount = 0;
-				}
-				col.push(...group);
-				colCount += group.length;
+			for (let i = 0; i < entries.length; i += entriesPerCol) {
+				columns.push(entries.slice(i, i + entriesPerCol));
 			}
-			if (col.length > 0) columns.push(col);
 			return columns;
 		}
 
@@ -1799,8 +1813,7 @@
 			if (titles.length === 0) return "";
 
 			const entries = buildTocEntries(titles, tocInsertIndex, tocPageCount);
-			const groups = groupTocEntries(entries);
-			const columns = packTocColumns(groups, entriesPerCol, tocCols);
+			const columns = packTocColumns(entries, entriesPerCol);
 
 			const spacer = topSpacing > 0 ? `{{paragraph ${":".repeat(topSpacing)}}}\n\n` : "";
 			const tocMarker = '<div class="toc-marker" style="display:none"></div>\n';
@@ -1822,10 +1835,15 @@
 				`--toc-subsection-color: ${fileStyles.tocSubsectionColor ?? '#58180D'};` +
 				`--toc-title-color: ${fileStyles.tocTitleColor ?? '#333333'};` +
 				`--toc-dot-color: ${fileStyles.tocDotColor ?? '#999999'};` +
-				`--toc-pagenum-color: ${fileStyles.tocPageNumColor ?? '#58180D'};` +
+				`--toc-section-pagenum-color: ${fileStyles.tocSectionPageNumColor ?? '#58180D'};` +
+				`--toc-subsection-pagenum-color: ${fileStyles.tocSubsectionPageNumColor ?? '#58180D'};` +
+				`--toc-title-pagenum-color: ${fileStyles.tocTitlePageNumColor ?? '#58180D'};` +
 				`--toc-section-size: ${fileStyles.tocSectionSize ?? 24}px;` +
 				`--toc-subsection-size: ${fileStyles.tocSubsectionSize ?? 18}px;` +
 				`--toc-title-size: ${fileStyles.tocTitleSize ?? 12}px;` +
+				`--toc-section-pagenum-size: ${fileStyles.tocSectionPageNumSize ?? 24}px;` +
+				`--toc-subsection-pagenum-size: ${fileStyles.tocSubsectionPageNumSize ?? 18}px;` +
+				`--toc-title-pagenum-size: ${fileStyles.tocTitlePageNumSize ?? 12}px;` +
 				`}\n` +
 				`.page.toc-page, .page.toc-page .columnWrapper { column-count: ${tocCols}; }`;
 		}
@@ -1845,29 +1863,39 @@
 			const tocPageCount = titles.length > 0 ? Math.max(1, Math.ceil(titles.length / (entriesPerCol * tocCols))) : 0;
 
 			const entries = buildTocEntries(titles, tocInsertIndex, tocPageCount);
-			const groups = groupTocEntries(entries);
-			const columns = packTocColumns(groups, entriesPerCol, tocCols);
+			const columns = packTocColumns(entries, entriesPerCol);
 
-			const spacerHtml = topSpacing > 0 ? '<br>'.repeat(topSpacing) : '';
+			const spacer = topSpacing > 0 ? `<p>${'<br>'.repeat(topSpacing)}</p>` : '';
+			const colBreak = '<div class="break"></div>';
+
 			const tocPagesHtml = [];
 			for (let i = 0; i < columns.length; i += tocCols) {
 				const pageCols = columns.slice(i, i + tocCols);
-				const html = pageCols.map(col =>
-					spacerHtml + col.map(e => e.html).join('')
-				).join('');
-				tocPagesHtml.push(html);
+				const colHtmls = pageCols.map(col =>
+					spacer + col.map(e => e.html).join('')
+				);
+				tocPagesHtml.push(colHtmls.join(colBreak));
 			}
 
-			// Update existing toc-page DOM elements directly
+			// Update only TOC entries within toc-page elements, preserving other content
 			const tocPages = shadow.querySelectorAll('.page.toc-page');
 			tocPages.forEach((page, idx) => {
 				const cw = page.querySelector('.columnWrapper');
 				if (cw && tocPagesHtml[idx] !== undefined) {
-					cw.innerHTML = tocPagesHtml[idx];
+					// Remove TOC-specific elements and layout elements from previous render
+					cw.querySelectorAll('.toc-section, .toc-subsection, .toc-entry, .toc-marker, .break').forEach(el => el.remove());
+					// Remove spacer paragraphs (bare <p> with only <br> children)
+					cw.querySelectorAll('p').forEach(el => {
+						if (el.classList.length === 0 && el.children.length > 0 && Array.from(el.children).every(c => c.tagName === 'BR')) {
+							el.remove();
+						}
+					});
+					// Insert new TOC HTML at the end of the columnWrapper
+					cw.insertAdjacentHTML('beforeend', tocPagesHtml[idx]);
 				}
 			});
 
-			// Update CSS variables + column count
+			// Update CSS variables + column count + top spacing
 			updateTocStyle();
 		}
 
@@ -1891,8 +1919,7 @@
 			let tocPageCount = titles.length > 0 ? Math.max(1, Math.ceil(titles.length / (entriesPerCol * tocCols))) : 0;
 			for (let pass = 0; pass < 3; pass++) {
 				const entries = buildTocEntries(titles, tocInsertIndex, tocPageCount);
-				const groups = groupTocEntries(entries);
-				const columns = packTocColumns(groups, entriesPerCol, tocCols);
+				const columns = packTocColumns(entries, entriesPerCol);
 				const actualPages = Math.max(1, Math.ceil(columns.length / tocCols));
 				if (actualPages === tocPageCount) break;
 				tocPageCount = actualPages;

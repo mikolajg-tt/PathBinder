@@ -376,7 +376,6 @@
     color: var(--toc-section-color, #58180D);
     margin-bottom: 0.1em;
     margin-top: 0.3em;
-    -webkit-text-stroke-width: 0.5px;
     letter-spacing: 0.02em;
     border-bottom: 2px solid var(--toc-section-color, #58180D);
     padding-bottom: 0.1em;
@@ -394,9 +393,8 @@
 
 .page .toc-section .toc-page {
     white-space: nowrap;
-    font-weight: bold;
-    font-size: var(--toc-section-size, 24px);
-    color: var(--toc-pagenum-color, #58180D);
+    font-size: var(--toc-section-pagenum-size, 24px);
+    color: var(--toc-section-pagenum-color, #58180D);
 }
 
 .page .toc-subsection {
@@ -407,7 +405,6 @@
     color: var(--toc-subsection-color, #58180D);
     margin-bottom: 0.2em;
     margin-top: 0.15em;
-    -webkit-text-stroke-width: 0.5px;
 }
 
 .page .toc-subsection .toc-text {
@@ -438,9 +435,14 @@
     top: -3px;
 }
 
-.page .toc-entry .toc-page,
 .page .toc-subsection .toc-page {
     white-space: nowrap;
-    font-weight: bold;
-    color: var(--toc-pagenum-color, #58180D);
+    font-size: var(--toc-subsection-pagenum-size, 18px);
+    color: var(--toc-subsection-pagenum-color, #58180D);
+}
+
+.page .toc-entry .toc-page {
+    white-space: nowrap;
+    font-size: var(--toc-title-pagenum-size, 12px);
+    color: var(--toc-title-pagenum-color, #58180D);
 }

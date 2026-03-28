@@ -54,11 +54,19 @@ button, #dropdownButton {
     background-color: var(--surface-3)
 }
 
+#writeAreaWrapper {
+    position: relative;
+    flex-basis: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
 #writeArea {
     font-family: monospace;
     line-height: 21px;
     overflow-y: auto;
-    flex-basis: 100%;
+    flex: 1 1 0;
 }
 
 .CodeMirror {
@@ -208,234 +216,255 @@ button, #dropdownButton {
     display: none!important;
 }
 
-/* ── Style Menu ── */
+/* ── Style Menu (overlay on writeArea) ── */
 .style-menu {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 100;
+    position: absolute;
+    inset: 0;
+    z-index: 50;
     background: var(--background);
-    border: 1px solid var(--outline);
-    border-radius: 12px;
-    padding: 0;
-    width: 480px;
-    max-height: 80vh;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.15s ease;
 }
 
-/* Title bar */
-.style-menu-header {
+.style-menu.visible {
+    opacity: 1;
+}
+
+/* ── Tab bar ── */
+.sm-tab-bar {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 14px 20px 0 20px;
-    color: var(--text);
-}
-
-.style-menu-header h3 {
-    margin: 0;
-    font-size: 1.15em;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-}
-
-.style-menu-close {
-    all: unset;
-    cursor: pointer;
-    font-size: 1.4em;
-    line-height: 1;
-    color: var(--outline);
-    padding: 2px 6px;
-    border-radius: 6px;
-    transition: background 0.15s, color 0.15s;
-    display: inline-block;
-    width: auto !important;
-}
-
-.style-menu-close:hover {
-    background: var(--outline);
-    color: var(--text);
-}
-
-/* Tab strip */
-.style-menu-tabs {
-    display: flex;
-    gap: 0;
-    padding: 12px 20px 0 20px;
+    background: var(--background);
+    flex-shrink: 0;
     border-bottom: 2px solid var(--outline);
 }
 
-.style-menu-tab {
-    all: unset;
+.sm-tab {
     cursor: pointer;
-    padding: 8px 18px;
-    font-size: 0.9em;
-    font-weight: 600;
-    color: var(--outline);
+    border: none;
+    padding: 6px;
+    background-color: var(--background);
+    font-family: 'Tauri', sans-serif;
+    font-weight: normal;
+    color: var(--text);
     border-bottom: 2px solid transparent;
     margin-bottom: -2px;
-    transition: color 0.15s, border-color 0.15s;
+    transition: border-color 0.15s;
     user-select: none;
-    width: auto !important;
-    display: inline-block !important;
-    text-align: center !important;
+    white-space: nowrap;
 }
 
-.style-menu-tab:hover {
-    color: var(--text);
+.sm-tab:hover {
+    background-color: var(--surface-1);
 }
 
-.style-menu-tab.active {
-    color: var(--text);
+.sm-tab.active {
     border-bottom-color: var(--primary);
 }
 
-/* Tab panels */
-.style-menu-panels {
+/* ── Panel container ── */
+.sm-panel-container {
     flex: 1;
     overflow-y: auto;
-    padding: 16px 20px 20px 20px;
+    padding: 12px 16px 16px 16px;
 }
 
-.style-menu-panel {
+.sm-panel {
     display: none;
 }
 
-.style-menu-panel.active {
-    display: block;
+.sm-panel.active {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
-/* Control rows */
+/* ── Section headings ── */
+.sm-section-heading {
+    font-size: 0.78em;
+    font-weight: 700;
+    color: var(--outline);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 10px 0 4px 0;
+    border-bottom: 1px solid var(--outline);
+}
+
+.sm-section-heading:first-child {
+    padding-top: 0;
+}
+
+/* ── Grid layouts ── */
+.sm-grid {
+    display: grid;
+    gap: 4px 16px;
+    padding: 4px 0;
+}
+
+.sm-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.sm-grid-4 {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.sm-grid-5 {
+    grid-template-columns: repeat(5, 1fr);
+}
+
+/* ── Rows ── */
 .sm-row {
-    margin-bottom: 14px;
-}
-
-.sm-row:last-child {
-    margin-bottom: 0;
+    padding: 6px 0;
 }
 
 .sm-label {
     display: block;
-    font-size: 0.82em;
-    font-weight: 600;
-    color: var(--outline);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 6px;
+    font-size: 0.92em;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 4px;
 }
 
-.sm-slider-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.sm-slider-row input[type="range"] {
-    flex: 1;
-    accent-color: var(--primary);
-    height: 6px;
-}
-
-.sm-slider-row input[type="number"] {
-    width: 52px;
+.sm-num {
+    width: 100%;
+    box-sizing: border-box;
     text-align: center;
     color: var(--text);
-    background: var(--background);
+    background: var(--surface-1);
     border: 1px solid var(--outline);
     border-radius: 6px;
-    padding: 4px 6px;
-    font-size: 0.9em;
-}
-
-.sm-slider-row .sm-suffix {
-    font-size: 0.85em;
-    color: var(--outline);
-}
-
-/* Color row */
-.sm-color-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.sm-color-row input[type="text"] {
-    flex: 1;
-    color: var(--text);
-    background: var(--background);
-    border: 1px solid var(--outline);
-    border-radius: 6px;
-    padding: 5px 10px;
-    font-size: 0.9em;
+    padding: 5px 6px;
+    font-size: 1em;
     font-family: monospace;
 }
 
-.sm-color-swatch {
-    width: 34px;
-    height: 34px;
+.sm-num:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* ── Color row ── */
+.sm-color-row {
+    display: flex;
+    flex-direction: column;
+}
+
+.sm-color-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sm-swatch {
+    width: 28px;
+    height: 28px;
     border: 2px solid var(--outline);
-    border-radius: 8px;
+    border-radius: 6px;
     cursor: pointer;
     padding: 0;
     overflow: hidden;
     flex-shrink: 0;
 }
 
-.sm-color-swatch::-webkit-color-swatch-wrapper {
+.sm-swatch::-webkit-color-swatch-wrapper {
     padding: 0;
 }
 
-.sm-color-swatch::-webkit-color-swatch {
+.sm-swatch::-webkit-color-swatch {
     border: none;
-    border-radius: 6px;
+    border-radius: 4px;
 }
 
-/* Toggle / checkbox row */
-.sm-toggle-row {
+.sm-color-text {
+    flex: 1;
+    min-width: 0;
+    color: var(--text);
+    background: var(--surface-1);
+    border: 1px solid var(--outline);
+    border-radius: 6px;
+    padding: 5px 6px;
+    font-size: 0.92em;
+    font-family: monospace;
+    text-align: center;
+}
+
+.sm-color-text:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* ── Toggle switch ── */
+.sm-toggle {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 4px 0;
+    justify-content: space-between;
     cursor: pointer;
-    font-size: 0.92em;
-    color: var(--text);
 }
 
-.sm-toggle-row input[type="checkbox"] {
-    accent-color: var(--primary);
+.sm-switch {
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--outline);
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.sm-switch.on {
+    background: var(--primary);
+}
+
+.sm-switch-knob {
     width: 16px;
     height: 16px;
-}
-
-/* Button control */
-.sm-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 8px 16px;
-    border: 1px solid var(--outline);
-    border-radius: 8px;
+    border-radius: 50%;
     background: var(--background);
-    color: var(--text);
-    font-size: 0.9em;
-    font-weight: 500;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: left 0.2s;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.sm-switch.on .sm-switch-knob {
+    left: 18px;
+}
+
+/* ── Segmented control ── */
+.sm-segmented {
+    display: flex;
+    background: var(--surface-1);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+    margin-top: 6px;
+}
+
+.sm-seg-btn {
+    all: unset;
     cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
-    width: auto !important;
-    text-align: center !important;
+    flex: 1;
+    text-align: center;
+    padding: 6px 12px;
+    font-size: 1em;
+    font-weight: 500;
+    color: var(--outline);
+    border-radius: 6px;
+    transition: background 0.15s, color 0.15s;
+    user-select: none;
 }
 
-.sm-button:hover {
-    border-color: var(--text);
+.sm-seg-btn:hover {
+    color: var(--text);
 }
 
-.sm-button .sm-button-state {
-    font-weight: 700;
+.sm-seg-btn.active {
+    background: var(--primary);
+    color: var(--background);
+    font-weight: 600;
 }
 
 .modal {
