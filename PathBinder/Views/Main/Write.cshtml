@@ -22,6 +22,21 @@
 			</div>
 		</nav>
 		<div id="writeAreaWrapper">
+			<div id="searchPanel" class="hidden">
+				<div class="search-row">
+					<button id="searchModeToggle" title="Toggle Replace"><i class="fa-solid fa-chevron-right"></i></button>
+					<input type="text" id="searchField" placeholder="Search..." />
+					<span id="searchCount"></span>
+					<button id="searchPrev" title="Previous (Shift+Enter)"><i class="fa-solid fa-arrow-up"></i></button>
+					<button id="searchNext" title="Next (Enter)"><i class="fa-solid fa-arrow-down"></i></button>
+					<button id="searchClose" title="Close (Esc)"><i class="fa-solid fa-xmark"></i></button>
+				</div>
+				<div id="replaceRow" class="search-row hidden">
+					<input type="text" id="replaceField" placeholder="Replace..." />
+					<button id="replaceNext">Replace</button>
+					<button id="replaceAll">Replace All</button>
+				</div>
+			</div>
 			<div id="writeArea">
 			</div>
 			<div id="styleMenu" class="style-menu hidden">
@@ -48,9 +63,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/markdown/markdown.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/search/searchcursor.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/search/search.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/dialog/dialog.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/search/jump-to-line.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js"></script>
 <script>
 	const defaultStyles = {
@@ -434,7 +446,8 @@
 			"dc": {"html": "span"},
 			"mask": {"html": "div"},
 			"shape": {"html": "div"},
-			"pagenumber":{"html": "p", "classes": ["paragraph"]}
+			"pagenumber":{"html": "p", "classes": ["paragraph"]},
+			"currentsection":{"html": "p", "classes": ["paragraph"]}
 		}
 		const dcs = {
 			0: 14, 1: 15, 2: 16, 3: 18, 4: 19, 5: 20, 6: 22, 7: 23, 8: 24, 9: 26,
@@ -495,16 +508,8 @@
 			mode: "mustacheHighlight",
 			scrollbarStyle: "native",
 			extraKeys: {
-				"Ctrl-F": "findPersistent",
-				"Shift-Enter": "findPrev",
-				"Esc": "clearSearch",
-				"Enter": function (cm) {
-					if (cm?.state?.search?.query) {
-						cm.execCommand("findNext");
-					} else {
-						cm.replaceSelection("\n", "end");
-					}
-				},
+				"Ctrl-F": function () { openSearchPanel(); },
+				"Esc": function () { closeSearchPanel(); },
 				"Ctrl-B": function (cm) {
 					toggleWrapSelection(cm, "**");
 				},
@@ -514,6 +519,162 @@
 			}
 		});
 		editor.addOverlay({ name: "mustacheHighlight" });
+
+		// Custom search/replace
+		const searchPanel = document.getElementById('searchPanel');
+		const searchField = document.getElementById('searchField');
+		const replaceField = document.getElementById('replaceField');
+		const replaceRow = document.getElementById('replaceRow');
+		const searchModeToggle = document.getElementById('searchModeToggle');
+		const searchCountEl = document.getElementById('searchCount');
+		let searchMarks = [];
+		let currentMatchIndex = -1;
+		let matches = [];
+
+		let lastSearchQuery = '';
+
+		function openSearchPanel(showReplace) {
+			searchPanel.classList.remove('hidden');
+			const sel = editor.getSelection();
+			if (sel) searchField.value = sel;
+			searchField.focus();
+			searchField.select();
+			if (showReplace) {
+				replaceRow.classList.remove('hidden');
+				searchModeToggle.classList.add('active');
+			}
+		}
+
+		function closeSearchPanel() {
+			searchPanel.classList.add('hidden');
+			replaceRow.classList.add('hidden');
+			searchModeToggle.classList.remove('active');
+			clearSearchMarks();
+			searchCountEl.textContent = '';
+			lastSearchQuery = '';
+			editor.focus();
+		}
+
+		function clearSearchMarks() {
+			searchMarks.forEach(m => m.clear());
+			searchMarks = [];
+			matches = [];
+			currentMatchIndex = -1;
+		}
+
+		function performSearch() {
+			clearSearchMarks();
+			const query = searchField.value;
+			lastSearchQuery = query;
+			if (!query) {
+				searchCountEl.textContent = '';
+				return;
+			}
+			const cursor = editor.getSearchCursor(query, null, { caseFold: true });
+			while (cursor.findNext()) {
+				const from = cursor.from();
+				const to = cursor.to();
+				matches.push({ from, to });
+				searchMarks.push(editor.markText(from, to, { className: 'cm-searching' }));
+			}
+			if (matches.length === 0) {
+				searchCountEl.textContent = 'No results';
+				return;
+			}
+			// Find closest match to current cursor
+			const cursorPos = editor.getCursor();
+			currentMatchIndex = 0;
+			for (let i = 0; i < matches.length; i++) {
+				const m = matches[i].from;
+				if (m.line > cursorPos.line || (m.line === cursorPos.line && m.ch >= cursorPos.ch)) {
+					currentMatchIndex = i;
+					break;
+				}
+			}
+			highlightCurrentMatch();
+		}
+
+		function highlightCurrentMatch() {
+			if (matches.length === 0) return;
+			// Reset all marks to default style
+			searchMarks.forEach((m, i) => {
+				const pos = matches[i];
+				m.clear();
+				searchMarks[i] = editor.markText(pos.from, pos.to, { className: 'cm-searching' });
+			});
+			// Highlight current match
+			const pos = matches[currentMatchIndex];
+			searchMarks[currentMatchIndex].clear();
+			searchMarks[currentMatchIndex] = editor.markText(pos.from, pos.to, { className: 'cm-searching cm-searching-current' });
+			editor.scrollIntoView({ from: pos.from, to: pos.to }, 50);
+			editor.setCursor(pos.from);
+			searchCountEl.textContent = `${currentMatchIndex + 1} of ${matches.length}`;
+		}
+
+		function searchNext() {
+			if (matches.length === 0) return;
+			currentMatchIndex = (currentMatchIndex + 1) % matches.length;
+			highlightCurrentMatch();
+		}
+
+		function searchPrev() {
+			if (matches.length === 0) return;
+			currentMatchIndex = (currentMatchIndex - 1 + matches.length) % matches.length;
+			highlightCurrentMatch();
+		}
+
+		function replaceNextMatch() {
+			if (matches.length === 0) return;
+			const pos = matches[currentMatchIndex];
+			const replacement = replaceField.value;
+			editor.replaceRange(replacement, pos.from, pos.to);
+			performSearch();
+		}
+
+		function replaceAllMatches() {
+			if (matches.length === 0) return;
+			const replacement = replaceField.value;
+			// Replace from bottom to top so positions stay valid
+			for (let i = matches.length - 1; i >= 0; i--) {
+				editor.replaceRange(replacement, matches[i].from, matches[i].to);
+			}
+			performSearch();
+		}
+
+		searchField.addEventListener('keydown', function (e) {
+			if (e.key === 'Escape') { closeSearchPanel(); e.preventDefault(); }
+			else if (e.key === 'Enter' && e.shiftKey) {
+				if (searchField.value !== lastSearchQuery) { performSearch(); }
+				else { searchPrev(); }
+				e.preventDefault();
+			}
+			else if (e.key === 'Enter') {
+				if (searchField.value !== lastSearchQuery) { performSearch(); }
+				else { searchNext(); }
+				e.preventDefault();
+			}
+		});
+		replaceField.addEventListener('keydown', function (e) {
+			if (e.key === 'Escape') { closeSearchPanel(); e.preventDefault(); }
+			if (e.key === 'Enter') { replaceNextMatch(); e.preventDefault(); }
+		});
+		searchModeToggle.addEventListener('click', function () {
+			replaceRow.classList.toggle('hidden');
+			this.classList.toggle('active');
+			if (!replaceRow.classList.contains('hidden')) replaceField.focus();
+		});
+		document.getElementById('searchNext').addEventListener('click', function () {
+			if (searchField.value !== lastSearchQuery) { performSearch(); }
+			else { searchNext(); }
+		});
+		document.getElementById('searchPrev').addEventListener('click', function () {
+			if (searchField.value !== lastSearchQuery) { performSearch(); }
+			else { searchPrev(); }
+		});
+		document.getElementById('searchClose').addEventListener('click', closeSearchPanel);
+		document.getElementById('replaceNext').addEventListener('click', replaceNextMatch);
+		document.getElementById('replaceAll').addEventListener('click', replaceAllMatches);
+
 		let autosaveTimeout;
 		let renderFrame;
 		let cachedPageTexts = [];
@@ -1568,6 +1729,9 @@
 						else if ((elementName === "title" || elementName === "section" || elementName === "subsection") && key === "text-shadow") {
 							newElement.style.setProperty("text-shadow", `-3px -3px 0 ${value}, 0px -3px 0 ${value}, 3px -3px 0 ${value}, -3px 0px 0 ${value}, 3px 0px 0 ${value}, -3px 3px 0 ${value}, 0px 3px 0 ${value}, 3px 3px 0 ${value}, -2px -2px 0 ${value}, 2px -2px 0 ${value}, -2px 2px 0 ${value}, 2px 2px 0 ${value}`);
 						}
+						else if (elementName === "currentsection" && key === "small") {
+							newElement.dataset.smallSize = value;
+						}
 						else if (key in assignMap) {
 							if (value != null) {
 								value = value.replace('%', '');
@@ -1671,6 +1835,11 @@
 					}
 				}
 
+				if (elementName === "currentsection") {
+					shouldAttach = true;
+					newElement.dataset.smallSize = '0.7em';
+				}
+
 
 				if (elementName === "dc") {
 					newElement.innerHTML = 'DC ' + dcs[content.trim()];
@@ -1684,6 +1853,20 @@
 						newElement.appendChild(document.createElement("br"));
 
 					}
+				}
+
+				if (elementName === "currentsection" && newElement) {
+					let sectionText = content.trim();
+					if (!sectionText) {
+						const cs = currentSectionPerPage[pageNumber - 1] || {};
+						sectionText = cs.subsection ? `${cs.section} - ${cs.subsection}` : cs.section || '';
+					}
+					const smallSize = newElement.dataset.smallSize;
+					delete newElement.dataset.smallSize;
+					newElement.innerHTML = sectionText.toUpperCase().split(' ').map(word => {
+						if (word.length <= 1) return word;
+						return word[0] + `<span style="font-size:${smallSize}">${word.slice(1)}</span>`;
+					}).join(' ');
 				}
 
 				if (margin > 0) {
@@ -1929,6 +2112,28 @@
 			cachedPageTexts = [];
 		}
 
+		let currentSectionPerPage = [];
+
+		function buildCurrentSections(pageTexts) {
+			currentSectionPerPage = [];
+			let lastSection = '';
+			let lastSubsection = '';
+			const tagRegex = /\{\{(section|subsection)\s+([\s\S]*?)(?:\[.*?\])?\s*\}\}/g;
+
+			for (let i = 0; i < pageTexts.length; i++) {
+				let match;
+				while ((match = tagRegex.exec(pageTexts[i])) !== null) {
+					if (match[1] === 'section') {
+						lastSection = match[2].trim();
+						lastSubsection = '';
+					} else {
+						lastSubsection = match[2].trim();
+					}
+				}
+				currentSectionPerPage[i] = { section: lastSection, subsection: lastSubsection };
+			}
+		}
+
 		function displayChange() {
 			let htmlContent = editor.getValue();
 
@@ -1942,6 +2147,7 @@
 			}
 
 			let pageTexts = htmlContent.split("\{\{pagebreak\}\}");
+			buildCurrentSections(pageTexts);
 			let existingPages = shadow.querySelectorAll('.page');
 
 			for (let i = existingPages.length - 1; i >= pageTexts.length; i--) {
@@ -2113,7 +2319,8 @@
 				'ul { display: block; list-style-type: disc; margin-block-start: 1em; margin-block-end: 1em; padding-inline-start: 40px; unicode-bidi: isolate; }\n' +
 				'<\/style>';
 
-			var html = '<!DOCTYPE html><html><head>' + links + printCSS +
+			var tocStyleForPrint = '<style>' + tocDynamicStyle.textContent.replace(':host', ':root') + '<\/style>';
+			var html = '<!DOCTYPE html><html><head>' + links + printCSS + tocStyleForPrint +
 				'<\/head><body>' + shadow.innerHTML + '<\/body><\/html>';
 
 			// Restore original mask elements in the live DOM

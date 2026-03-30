@@ -92,30 +92,89 @@ button, #dropdownButton {
     color: var(--text);
 }
 
-.CodeMirror-dialog {
-    padding: 6px;
-    width: 100%;
-    position: absolute;
-    top: 0;
+#searchPanel {
     background-color: var(--background);
     border-bottom: 1px solid var(--outline);
+    padding: 6px 8px;
     font-family: 'Tauri', sans-serif;
-    font-weight: normal;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
-.CodeMirror-search-field {
+.search-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+}
+
+#replaceRow {
+    padding-left: 29px;
+}
+
+#searchField, #replaceField {
     background-color: var(--surface-1);
     border: 1px solid var(--outline);
+    color: var(--text);
+    font-family: 'Tauri', sans-serif;
+    padding: 3px 6px;
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
-.CodeMirror-search-field:focus {
+#searchField:focus, #replaceField:focus {
     background-color: var(--surface-3);
     outline: none;
+}
+
+#searchCount {
+    font-size: 12px;
+    color: var(--text);
+    white-space: nowrap;
+}
+
+#searchPanel button {
+    background-color: var(--surface-1);
+    border: 1px solid var(--outline);
+    color: var(--text);
+    font-family: 'Tauri', sans-serif;
+    padding: 3px 8px;
+    cursor: pointer;
+    border-radius: 3px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+#searchPanel button:hover {
+    background-color: var(--surface-3);
+}
+
+#searchModeToggle {
+    width: 25px;
+    flex: 0 0 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#searchModeToggle i {
+    margin: 0;
+}
+
+#searchModeToggle.active i {
+    transform: rotate(90deg);
 }
 
 .cm-searching {
     background-color: inherit !important;
     border: 1px solid var(--outline);
+}
+
+.cm-searching-current {
+    background-color: var(--surface-4) !important;
+    border: 1px solid var(--primary);
 }
 
 .cm-mustache-brackets {
